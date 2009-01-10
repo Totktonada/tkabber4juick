@@ -26,3 +26,4 @@ proc handle_message {chatid from type body x} {
 }
 
 hook::add draw_message_hook [namespace current]::handle_message 10
+}
