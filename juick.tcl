@@ -1,32 +1,32 @@
 namespace eval juick {
 proc render_body {chatw mes} {
     while {![cequal $mes ""]} {
-	set loc ""
-	regexp -indices {(#\d+|@[\w-_]+)} $mes loc
-	if {[cequal $loc ""]} { $chatw insert end $mes; break } else {
-	    set ms [lindex $loc 0]
-	    set me [lindex $loc 1]
-	    $chatw insert end [string range $mes 0 [expr {$ms - 1}]]
-        set thing [string range $mes $ms $me]
-	    if { [cequal [string index $mes $ms] "#" ]} {
-            set type JNUM
-        } else {
-            set type JNICK
+        set loc ""
+        regexp -indices {(#\d+|@[\w-_]+)} $mes loc
+        if {[cequal $loc ""]} { $chatw insert end $mes; break } else {
+            set ms [lindex $loc 0]
+            set me [lindex $loc 1]
+            $chatw insert end [string range $mes 0 [expr {$ms - 1}]]
+            set thing [string range $mes $ms $me]
+            if { [cequal [string index $mes $ms] "#" ]} {
+                set type JNUM
+            } else {
+                set type JNICK
+            }
+            set id JUICK-$thing
+            $chatw insert end $thing "$id $type"
+            set mes [string range $mes [expr {$me+1}] end]
         }
-        set id JUICK-$thing
-	    $chatw insert end $thing "$id $type"
-	    set mes [string range $mes [expr {$me+1}] end]
-	}
     }
 }
 
 proc handle_message {chatid from type body x} {
     if {[cequal $from "juick@juick.com/Juick"]} {
         set chatw [chat::chat_win $chatid]
-	$chatw tag configure JNICK -foreground red
-	$chatw tag configure JNUM -foreground blue
-	render_body $chatw $body
-	return stop
+        $chatw tag configure JNICK -foreground red
+        $chatw tag configure JNUM -foreground blue
+        render_body $chatw $body
+        return stop
     }
 }
 
@@ -39,7 +39,7 @@ proc insert_from_window {chatid w x y} {
     set tags [$cw tag names "@$x,$y"]
 
     if {[set idx [lsearch -glob $tags JUICK-*]] >= 0} {
-	set thing [string range [lindex $tags $idx] 6 end]
+        set thing [string range [lindex $tags $idx] 6 end]
     }
 
     if {$thing == ""} return
@@ -52,3 +52,4 @@ hook::add chat_window_click_hook \
     [namespace current]::insert_from_window
 
 }
+# vi:ts=4:et
