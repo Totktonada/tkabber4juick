@@ -32,6 +32,14 @@ proc handle_message {chatid from type body x} {
 
 hook::add draw_message_hook [namespace current]::handle_message 10
 
+proc ignore_server_messages {chatid from type body x} {
+    if {[string first "juick@juick.com" $chatid] >= 0 && $from == ""} {
+        return stop;
+    }
+}
+
+hook::add draw_message_hook [namespace current]::ignore_server_messages 0
+
 proc insert_from_window {chatid w x y} {
     set thing ""
     set cw [chat::chat_win $chatid]
