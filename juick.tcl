@@ -2,7 +2,7 @@ namespace eval juick {
 proc render_body {chatw mes} {
     while {![cequal $mes ""]} {
         set loc ""
-        regexp -indices {(#\d+|@[\w-_]+)} $mes loc
+        regexp -indices {(#\d+|@[\w@.-]+)} $mes loc
         if {[cequal $loc ""]} { $chatw insert end $mes; break } else {
             set ms [lindex $loc 0]
             set me [lindex $loc 1]
