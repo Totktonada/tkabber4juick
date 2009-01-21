@@ -20,12 +20,22 @@ proc render_body {chatw mes} {
     }
 }
 
+proc render_my_message {chatw mes} {
+    $chatw insert end $mes "JMY"
+}
+
 proc handle_message {chatid from type body x} {
-    if {[cequal $from "juick@juick.com/Juick"]} {
+    set jid [chat::get_jid $chatid]
+    if {[cequal $jid "juick@juick.com/Juick"]} {
         set chatw [chat::chat_win $chatid]
         $chatw tag configure JNICK -foreground red
         $chatw tag configure JNUM -foreground blue
-        render_body $chatw $body
+        $chatw tag configure JMY -foreground gray
+        if {[cequal $jid $from]} {
+            render_body $chatw $body
+        } else {
+            render_my_message $chatw $body
+        }
         return stop
     }
 }
