@@ -1,28 +1,4 @@
 namespace eval juick {
-proc render_body {chatw mes} {
-    while {![cequal $mes ""]} {
-        set loc ""
-        regexp -indices {(#\d+|@[\w@.-]+)} $mes loc
-        if {[cequal $loc ""]} { $chatw insert end $mes; break } else {
-            set ms [lindex $loc 0]
-            set me [lindex $loc 1]
-            $chatw insert end [string range $mes 0 [expr {$ms - 1}]]
-            set thing [string range $mes $ms $me]
-            if { [cequal [string index $mes $ms] "#" ]} {
-                set type JNUM
-            } else {
-                set type JNICK
-            }
-            set id JUICK-$thing
-            $chatw insert end $thing "$id $type"
-            set mes [string range $mes [expr {$me+1}] end]
-        }
-    }
-}
-
-proc render_my_message {chatw mes} {
-    $chatw insert end $mes "JMY"
-}
 
 proc handle_message {chatid from type body x} {
     set jid [chat::get_jid $chatid]
@@ -32,9 +8,9 @@ proc handle_message {chatid from type body x} {
         $chatw tag configure JNUM -foreground blue
         $chatw tag configure JMY -foreground gray
         if {[cequal $jid $from]} {
-            render_body $chatw $body
+            ::richtext::render_message $chatw $body {}
         } else {
-            render_my_message $chatw $body
+            ::richtext::render_message $chatw $body JMY
         }
         return stop
     }
@@ -69,5 +45,80 @@ proc insert_from_window {chatid w x y} {
 hook::add chat_window_click_hook \
     [namespace current]::insert_from_window
 
+
+# --------------
+# RichText stuff
+
+proc configure_richtext_widget {w} {
+    $w tag configure JNICK -foreground red
+    $w tag configure JNUM -foreground blue
+    $w tag configure JMY -foreground gray
+}
+
+proc spot {what at startVar endVar} {
+    set matched [regexp -indices \
+        -start $at -- {(?:\s|\n|\A)(#\d+|@[\w@.-]+)} $what -> bounds]
+
+    if {!$matched} { return false }
+
+    upvar 1 $startVar us $endVar ue
+    lassign $bounds us ue
+    return true
+}
+
+proc process {atLevel accName} {
+    upvar #$atLevel $accName chunks
+
+    set out {}
+
+    foreach {s type tags} $chunks {
+        if {$type != "text"} {
+            # pass through
+            lappend out $s $type $tags
+            continue
+        }
+
+        set ix 0; set us 0; set ue 0
+        
+        while {[spot $s $ix us ue]} {
+            if {$us - $ix > 0} {
+                # dump chunk before juick
+                lappend out [string range $s $ix [expr {$us - 1}]] $type $tags
+            }
+
+            set thing [string range $s $us $ue]
+
+            lappend out $thing juick $tags
+
+            set ix [expr {$ue + 1}]
+        }
+
+        if {[string length $s] - $ix > 0} {
+        lappend out [string range $s $ix end] $type $tags
+        }
+    }
+
+    set chunks $out
+}
+
+proc render {w type thing tags args} {
+    if {[cequal [string index $thing 0] "#" ]} {
+        set type JNUM
+    } else {
+        set type JNICK
+    }
+    set id JUICK-$thing
+    $w insert end $thing [lfuse $tags [list $id $type JUICK]]
+    return $id
+}
+
+
+::richtext::register_entity juick \
+    -configurator [namespace current]::configure_richtext_widget \
+    -parser [namespace current]::process \
+    -renderer [namespace current]::render \
+    -parser-priority 60
+
+    ::richtext::entity_state juick 1
 }
 # vi:ts=4:et
