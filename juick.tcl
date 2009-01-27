@@ -3,6 +3,7 @@ namespace eval juick {
 proc handle_message {chatid from type body x} {
     set jid [chat::get_jid $chatid]
     if {[cequal $jid "juick@juick.com/Juick"]} {
+        ::richtext::property_add {JUICK} {}
         set chatw [chat::chat_win $chatid]
         $chatw tag configure JNICK -foreground red
         $chatw tag configure JNUM -foreground blue
@@ -68,6 +69,8 @@ proc spot {what at startVar endVar} {
 
 proc process {atLevel accName} {
     upvar #$atLevel $accName chunks
+
+    if {![::richtext::property_exists {JUICK}]} {return}
 
     set out {}
 
