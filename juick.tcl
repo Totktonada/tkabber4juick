@@ -39,7 +39,7 @@ proc insert_from_window {chatid w x y} {
 
     if {$thing == ""} return
 
-    $ci insert end "$thing "
+    $ci insert insert "$thing "
     return stop
 }
 
