@@ -52,6 +52,10 @@ proc insert_from_window {chatid w x y} {
 hook::add chat_window_click_hook \
     [namespace current]::insert_from_window
 
+variable commands {HELP NICK LOGIN S U ON OFF D BL PM VCARD PING}
+proc correct_command {chatid user body type} {
+   # Maybe once I'll get arount to it 
+}
 
 # --------------
 # RichText stuff
