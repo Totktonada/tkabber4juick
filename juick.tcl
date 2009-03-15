@@ -1,10 +1,16 @@
 namespace eval juick {
 
-proc handle_message {chatid from type body x} {
+# Determines whether given chatid correspond to Juick
+proc is_juick {chatid} {
     set jid [chat::get_jid $chatid]
-    if {[cequal $jid "juick@juick.com/Juick"]} {
+    return [cequal $jid "juick@juick.com/Juick"]
+}
+
+proc handle_message {chatid from type body x} {
+    if {[is_juick $chatid]} {
         ::richtext::property_add {JUICK} {}
         set chatw [chat::chat_win $chatid]
+        set jid [chat::get_jid $chatid]
         $chatw tag configure JNICK -foreground red
         $chatw tag configure JNUM -foreground blue
         $chatw tag configure JMY -foreground gray
@@ -20,7 +26,7 @@ proc handle_message {chatid from type body x} {
 hook::add draw_message_hook [namespace current]::handle_message 10
 
 proc ignore_server_messages {chatid from type body x} {
-    if {[string first "juick@juick.com" $chatid] >= 0 && $from == ""} {
+    if {[is_juick $chatid] && $from == ""} {
         return stop;
     }
 }
