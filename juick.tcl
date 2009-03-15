@@ -68,7 +68,7 @@ proc configure_richtext_widget {w} {
 
 proc spot {what at startVar endVar} {
     set matched [regexp -indices \
-        -start $at -- {(?:\s|\n|\A)(#\d+|@[\w@.-]+)} $what -> bounds]
+        -start $at -- {(?:\s|\n|\A)(#\d+(/\d+)?|@[\w@.-]+)} $what -> bounds]
 
     if {!$matched} { return false }
 
