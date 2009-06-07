@@ -3,7 +3,8 @@ namespace eval juick {
 # Determines whether given chatid correspond to Juick
 proc is_juick {chatid} {
     set jid [chat::get_jid $chatid]
-    return [cequal $jid "juick@juick.com/Juick"]
+#    return [cequal $jid "juick@juick.com/Juick"]
+     return [expr [cequal $jid "juick@juick.com/Juick"] || [regexp "juick%juick.com@*/Juick" $jid]]
 }
 
 proc handle_message {chatid from type body x} {
