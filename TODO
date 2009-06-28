@@ -1,5 +1,6 @@
 + Richtext
-+ Clickable nicks/nums
++ Clickable nicks/nums/tag
 - Command completion
 - Command aliases
 - Command validation
+- Colored citation

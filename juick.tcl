@@ -13,6 +13,7 @@ proc handle_message {chatid from type body x} {
         set chatw [chat::chat_win $chatid]
         set jid [chat::get_jid $chatid]
         $chatw tag configure JNICK -foreground red
+        $chatw tag configure JTAG -foreground ForestGreen
         $chatw tag configure JNUM -foreground blue
         $chatw tag configure JMY -foreground gray
         if {[cequal $jid $from]} {
@@ -63,13 +64,14 @@ proc correct_command {chatid user body type} {
 
 proc configure_richtext_widget {w} {
     $w tag configure JNICK -foreground red
+    $w tag configure JTAG -foreground ForestGreen
     $w tag configure JNUM -foreground blue
     $w tag configure JMY -foreground gray
 }
 
 proc spot {what at startVar endVar} {
     set matched [regexp -indices \
-        -start $at -- {(?:\s|\n|\A)(#\d+(/\d+)?|@[\w@.-]+)} $what -> bounds]
+        -start $at -- {(?:\s|\n|\A)(#\d+(/\d+)?|@[\w@.-]+|\*[\w?.-]+)} $what -> bounds]
 
     if {!$matched} { return false }
 
@@ -119,13 +121,16 @@ proc render {w type thing tags args} {
     if {[cequal [string index $thing 0] "#" ]} {
         set type JNUM
     } else {
-        set type JNICK
-    }
+           if {[cequal [string index $thing 0] "*" ]} {
+               set type JTAG
+           } else {
+                  set type JNICK
+                  }
+           }
     set id JUICK-$thing
     $w insert end $thing [lfuse $tags [list $id $type JUICK]]
     return $id
 }
-
 
 ::richtext::register_entity juick \
     -configurator [namespace current]::configure_richtext_widget \
