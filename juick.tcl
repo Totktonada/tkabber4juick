@@ -4,7 +4,7 @@ namespace eval juick {
 proc is_juick {chatid} {
     set jid [chat::get_jid $chatid]
 #    return [cequal $jid "juick@juick.com/Juick"]
-     return [expr [cequal $jid "juick@juick.com/Juick"] || [regexp "juick%juick.com@.*/Juick" $jid]]
+     return [expr [cequal $jid "juick@juick.com/Juick"] || [regexp "juick%juick.com@.+/Juick" $jid]]
 }
 
 proc handle_message {chatid from type body x} {
@@ -15,6 +15,7 @@ proc handle_message {chatid from type body x} {
         $chatw tag configure JNICK -foreground red
         $chatw tag configure JTAG -foreground ForestGreen
         $chatw tag configure JNUM -foreground blue
+        $chatw tag configure JCITING -foreground gray35
         $chatw tag configure JMY -foreground gray
         if {[cequal $jid $from]} {
             ::richtext::render_message $chatw $body {}
@@ -66,12 +67,17 @@ proc configure_richtext_widget {w} {
     $w tag configure JNICK -foreground red
     $w tag configure JTAG -foreground ForestGreen
     $w tag configure JNUM -foreground blue
+    $w tag configure JCITING -foreground gray35
     $w tag configure JMY -foreground gray
 }
 
 proc spot {what at startVar endVar} {
-    set matched [regexp -indices \
-        -start $at -- {(?:\s|\n|\A|\()(#\d+(/\d+)?|@[\w@.-]+|\*[\w?.-]+)} $what -> bounds]
+    set matched [regexp -indices -start $at -- \
+    {(?:\s|\n|\A|\()(#\d+(/\d+)?|@[\w@.-]+|\*[\w?.-]+|>[^\n]+)} $what -> bounds]
+#    set matched [expr [regexp -indices -start $at -- \
+#    {(?:\s|\n|\A|\()(#\d+(/\d+)?|@[\w@.-]+|\*[\w?.-]+)} $what -> bounds] || \
+#                      [regexp -indices -start $at -- \
+#    {(?:\n|\A)(>[^\n]+)} $what -> bounds]]
 
     if {!$matched} { return false }
 
@@ -120,14 +126,22 @@ proc process {atLevel accName} {
 proc render {w type thing tags args} {
     if {[cequal [string index $thing 0] "#" ]} {
         set type JNUM
-    } else {
-           if {[cequal [string index $thing 0] "*" ]} {
-               set type JTAG
-           } else {
-                  set type JNICK
-                  }
-           }
+        } else {
+               if {[cequal [string index $thing 0] "*" ]} {
+                  set type JTAG
+                  } else {
+                         if {[cequal [string index $thing 0] "@" ]} {
+                            set type JNICK
+                            }
+                         }
+               }
     set id JUICK-$thing
+
+    if {[cequal [string index $thing 0] ">" ]} {
+       set type JCITING
+       set id CITING-$thing
+       }
+
     $w insert end $thing [lfuse $tags [list $id $type JUICK]]
     return $id
 }

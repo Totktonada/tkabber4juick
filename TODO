@@ -3,4 +3,5 @@
 - Command completion
 - Command aliases
 - Command validation
-- Colored citation
++ Colored citation
+- Copy nicks/nums/tag to clipboard
