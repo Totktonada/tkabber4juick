@@ -73,7 +73,7 @@ proc configure_richtext_widget {w} {
 
 proc spot {what at startVar endVar} {
     set matched [regexp -indices -start $at -- \
-    {(?:\s|\n|\A|\()(#\d+(/\d+)?|@[\w@.-]+|\*[\w?+.-]+|>[^\n]+)} $what -> bounds]
+    {(?:\s|\n|\A|\()(#\d+(/\d+)?|@[\w@.-]+|\*[\w?+'.-]+|>[^\n]+)} $what -> bounds]
 #    set matched [expr [regexp -indices -start $at -- \
 #    {(?:\s|\n|\A|\()(#\d+(/\d+)?|@[\w@.-]+|\*[\w?.-]+)} $what -> bounds] || \
 #                      [regexp -indices -start $at -- \
