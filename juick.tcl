@@ -2,12 +2,43 @@ package require msgcat
 
 namespace eval juick {
 
+::msgcat::mcload [file join [file dirname [info script]] msgs]
+
+if {![::plugins::is_registered juick]} {
+    ::plugins::register juick \
+              -namespace [namespace current] \
+              -source [info script] \
+              -description [::msgcat::mc "Whether the Juick plugin is loaded."] \
+              -loadcommand [namespace code load] \
+              -unloadcommand [namespace code unload]
+    return
+    }
+
+proc load {} {
+    ::richtext::entity_state citing 1
+    ::richtext::entity_state juick 1
+
+    hook::add draw_message_hook [namespace current]::ignore_server_messages 0
+    hook::add draw_message_hook [namespace current]::handle_message 21
+    hook::add chat_window_click_hook [namespace current]::insert_from_window
+    hook::add chat_win_popup_menu_hook [namespace current]::add_juick_things_menu 20
+}
+
+proc unload {} {
+    hook::remove draw_message_hook [namespace current]::ignore_server_messages 0
+    hook::remove draw_message_hook [namespace current]::handle_message 21
+    hook::remove chat_window_click_hook [namespace current]::insert_from_window
+    hook::remove chat_win_popup_menu_hook [namespace current]::add_juick_things_menu 20
+
+    ::richtext::entity_state citing 0
+    ::richtext::entity_state juick 0
+}
+
 # Determines whether given chatid correspond to Juick
 proc is_juick {chatid} {
     set jid [chat::get_jid $chatid]
 #    set jid [chat::get_jid [chat::winid_to_chatid [join [lrange [split $w .] 0 end-1] .]]]
-
-     return [expr [cequal $jid "juick@juick.com/Juick"] || [regexp "juick%juick.com@.+/Juick" $jid]]
+    return [expr [cequal $jid "juick@juick.com/Juick"] || [regexp "juick%juick.com@.+/Juick" $jid]]
 }
 
 proc handle_message {chatid from type body x} {
@@ -25,14 +56,12 @@ proc handle_message {chatid from type body x} {
         return stop
     }
 }
-hook::add draw_message_hook [namespace current]::handle_message 21
 
 proc ignore_server_messages {chatid from type body x} {
     if {[is_juick $chatid] && $from == ""} {
         return stop;
     }
 }
-hook::add draw_message_hook [namespace current]::ignore_server_messages 0
 
 proc insert_from_window {chatid w x y} {
     set thing ""
@@ -49,7 +78,6 @@ proc insert_from_window {chatid w x y} {
     $ci insert insert "$thing "
     return stop
 }
-hook::add chat_window_click_hook [namespace current]::insert_from_window
 
 proc add_juick_things_menu {m chatwin X Y x y} {
     set thing ""
@@ -63,7 +91,6 @@ proc add_juick_things_menu {m chatwin X Y x y} {
     $m add command -label [::msgcat::mc "\[J\] Copy thing to clipboard."] \
           -command [list [namespace current]::copy_thing $chatwin $thing]
 }
-hook::add chat_win_popup_menu_hook [namespace current]::add_juick_things_menu 20
 
 proc copy_thing {w thing} {
     clipboard clear -displayof $w
@@ -184,21 +211,16 @@ proc render_citing {w type thing tags args} {
     return $id
 }
 
-::msgcat::mcload [file join [file dirname [info script]] msgs]
-
-::richtext::register_entity juick \
-    -configurator [namespace current]::configure_juick \
-    -parser [namespace current]::process_juick \
-    -renderer [namespace current]::render_juick \
-    -parser-priority 85
-
 ::richtext::register_entity citing \
     -configurator [namespace current]::configure_citing \
     -parser [namespace current]::process_citing \
     -renderer [namespace current]::render_citing \
     -parser-priority 82
 
-    ::richtext::entity_state citing 1
-    ::richtext::entity_state juick 1
+::richtext::register_entity juick \
+    -configurator [namespace current]::configure_juick \
+    -parser [namespace current]::process_juick \
+    -renderer [namespace current]::render_juick \
+    -parser-priority 85
 }
 # vi:ts=4:et
