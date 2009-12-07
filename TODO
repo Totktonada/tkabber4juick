@@ -1,9 +1,12 @@
+# You can requesting feature to this plugin via jabber: Totktonada@totktonada.ru.
+# TODO: "-". Realised: "+".
+
 + Richtext
 + Clickable nicks/nums/tag
 - Command completion (necessary?)
 - Command aliases (necessary?)
 - Command validation (necessary?)
 + Colored citation
-? Copy nicks/nums/tag to clipboard (It work?)
++ Copy nicks/nums/tag to clipboard (Tkabber-way)
 + Dynamic load/unload.
 - Open things in browser(s).

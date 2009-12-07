@@ -129,7 +129,7 @@ proc spot_citing {what at startVar endVar} {
 
 proc spot_juick {what at startVar endVar} {
     set matched [regexp -indices -start $at -- \
-    {(?:\s|\n|\A|\(|\>)(#\d+(/\d+)?|@[\w@.-]+|\*[\w?!+'/.-]+)(?:(\.(\s|\n))?)} $what -> bounds]
+    {(?:\s|\n|\A|\(|\>)(#\d+(/\d+)?|@[\w@.-]+|(\*[\w?!+'/.-]+(?:[^*])))(?:(\.(\s|\n))?)} $what -> bounds]
 
     if {!$matched} { return false }
 
