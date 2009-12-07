@@ -4,35 +4,10 @@ namespace eval juick {
 
 ::msgcat::mcload [file join [file dirname [info script]] msgs]
 
-if {![::plugins::is_registered juick]} {
-    ::plugins::register juick \
-              -namespace [namespace current] \
-              -source [info script] \
-              -description [::msgcat::mc "Whether the Juick plugin is loaded."] \
-              -loadcommand [namespace code load] \
-              -unloadcommand [namespace code unload]
-    return
-    }
-
-proc load {} {
-    ::richtext::entity_state citing 1
-    ::richtext::entity_state juick 1
-
-    hook::add draw_message_hook [namespace current]::ignore_server_messages 0
-    hook::add draw_message_hook [namespace current]::handle_message 21
-    hook::add chat_window_click_hook [namespace current]::insert_from_window
-    hook::add chat_win_popup_menu_hook [namespace current]::add_juick_things_menu 20
-}
-
-proc unload {} {
-    hook::remove draw_message_hook [namespace current]::ignore_server_messages 0
-    hook::remove draw_message_hook [namespace current]::handle_message 21
-    hook::remove chat_window_click_hook [namespace current]::insert_from_window
-    hook::remove chat_win_popup_menu_hook [namespace current]::add_juick_things_menu 20
-
-    ::richtext::entity_state citing 0
-    ::richtext::entity_state juick 0
-}
+hook::add draw_message_hook [namespace current]::ignore_server_messages 0
+hook::add draw_message_hook [namespace current]::handle_message 21
+hook::add chat_window_click_hook [namespace current]::insert_from_window
+hook::add chat_win_popup_menu_hook [namespace current]::add_juick_things_menu 20
 
 # Determines whether given chatid correspond to Juick
 proc is_juick {chatid} {
@@ -222,5 +197,8 @@ proc render_citing {w type thing tags args} {
     -parser [namespace current]::process_juick \
     -renderer [namespace current]::render_juick \
     -parser-priority 85
+
+::richtext::entity_state citing 1
+::richtext::entity_state juick 1
 }
 # vi:ts=4:et
