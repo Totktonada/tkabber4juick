@@ -65,11 +65,24 @@ proc add_juick_things_menu {m chatwin X Y x y} {
     if {$thing == ""} return
     $m add command -label [::msgcat::mc "\[J\] Copy thing to clipboard."] \
           -command [list [namespace current]::copy_thing $chatwin $thing]
+    $m add command -label [::msgcat::mc "\[J\] Open thing in browser."] \
+          -command [list [namespace current]::browse_thing $chatwin $thing]
 }
 
 proc copy_thing {w thing} {
     clipboard clear -displayof $w
     clipboard append -displayof $w $thing
+}
+
+proc browse_thing {w thing} {
+    switch -regexp -- $thing {
+        {^[#@]} {
+          browseurl http://juick.com/[string range $thing 1 end]
+          }
+        {^\*} {
+          browseurl http://juick.com/last?tag=[string range $thing 1 end]
+          }
+    }
 }
 
 variable commands {HELP NICK LOGIN S U ON OFF D BL WL PM VCARD PING INVITE}
