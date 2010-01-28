@@ -100,8 +100,24 @@ proc configure_juick {w} {
     $w tag configure JMY -foreground gray
 }
 
+proc configure_juick_ligth {w} {
+#    $w tag configure JLIGTH -foreground gray
+    $w tag configure JLIGTH -background #FF9A15
+}
+
 proc configure_citing {w} {
     $w tag configure CITING -foreground gray35
+}
+
+proc spot_juick_ligth {what at startVar endVar} {
+    set matched [regexp -indices -start $at -- \
+    {(?:^Private message from @.+:\n)(.+$)} $what -> bounds]
+
+    if {!$matched} { return false }
+
+    upvar 1 $startVar uStart $endVar uEnd
+    lassign $bounds uStart uEnd
+    return true
 }
 
 proc spot_citing {what at startVar endVar} {
@@ -134,6 +150,10 @@ proc process_citing {atLevel accName} {
 return [process $atLevel $accName citing]
 }
 
+proc process_juick_ligth {atLevel accName} {
+return [process $atLevel $accName juick_ligth]
+}
+
 proc process {atLevel accName what} {
     upvar #$atLevel $accName chunks
 
@@ -141,7 +161,7 @@ proc process {atLevel accName what} {
     set out {}
 
     foreach {s type tags} $chunks {
-        if {[lsearch -regexp $type (text)|(citing)]<0} {
+        if {[lsearch -regexp $type (text)|(citing)|(juick_ligth)]<0} {
             # pass through
             lappend out $s $type $tags
             continue
@@ -149,6 +169,10 @@ proc process {atLevel accName what} {
 
         if {[expr [lsearch -exact $type citing]>=0]} {
         lappend tags CITING
+        }
+
+        if {[expr [lsearch -exact $type juick_ligth]>=0]} {
+        lappend tags JLIGTH
         }
 
         set index 0; set uStart 0; set uEnd 0
@@ -172,7 +196,7 @@ proc process {atLevel accName what} {
 }
 
 proc render_juick {w type thing tags args} {
-    if {[lsearch -exact $tags CITING]<0} {
+    if {[expr [lsearch -exact $tags CITING]<0] && [expr [lsearch -exact $tags JLIGTH]<0]} {
        if {[cequal [string index $thing 0] "#" ]} {
           set type JNUM
           } else {
@@ -185,8 +209,13 @@ proc render_juick {w type thing tags args} {
                            }
                  }
     } else {
-           set type CITING
+           if {[lsearch -exact $tags CITING]>=0} {
+               set type CITING
            }
+           if {[lsearch -exact $tags JLIGTH]>=0} {
+               set type JLIGTH
+           }
+    }
 
     set id JUICK-$thing
     $w insert end $thing [lfuse $tags [list $id $type JUICK]]
@@ -199,6 +228,17 @@ proc render_citing {w type thing tags args} {
     return $id
 }
 
+proc render_juick_ligth {w type thing tags args} {
+    set id JLIGTH-$thing
+    $w insert end $thing [lfuse $tags [list $id $type JLIGTH]]
+    return $id
+}
+
+::richtext::register_entity juick_ligth \
+    -configurator [namespace current]::configure_juick_ligth \
+    -parser [namespace current]::process_juick_ligth \
+    -renderer [namespace current]::render_juick_ligth \
+    -parser-priority 81
 ::richtext::register_entity citing \
     -configurator [namespace current]::configure_citing \
     -parser [namespace current]::process_citing \
