@@ -15,6 +15,7 @@ if {![::plugins::is_registered juick]} {
     }
 
 proc load {} {
+    ::richtext::entity_state juick_numbers 1
     ::richtext::entity_state citing 1
     ::richtext::entity_state juick 1
     ::richtext::entity_state juick_ligth 1
@@ -31,6 +32,7 @@ proc unload {} {
     hook::remove chat_window_click_hook [namespace current]::insert_from_window
     hook::remove chat_win_popup_menu_hook [namespace current]::add_juick_things_menu 20
 
+    ::richtext::entity_state juick_numbers 0
     ::richtext::entity_state citing 0
     ::richtext::entity_state juick 0
     ::richtext::entity_state juick_ligth 0
@@ -123,8 +125,11 @@ proc correct_command {chatid user body type} {
 proc configure_juick {w} {
     $w tag configure JNICK -foreground red
     $w tag configure JTAG -foreground ForestGreen
-    $w tag configure JNUM -foreground blue
     $w tag configure JMY -foreground gray
+}
+
+proc configure_juick_numbers {w} {
+    $w tag configure JNUM -foreground blue
 }
 
 proc configure_juick_ligth {w} {
@@ -160,7 +165,18 @@ proc spot_citing {what at startVar endVar} {
 
 proc spot_juick {what at startVar endVar} {
     set matched [regexp -indices -start $at -- \
-    {(?:\s|\n|\A|\(|\>)(#\d+(/\d+)?|@[\w@.-]+|\*[\w?!+'/.-]+)(?:(\.(\s|\n))?)} $what -> bounds]
+    {(?:\s|\n|\A|\(|\>)(@[\w@.-]+|\*[\w?!+'/.-]+)(?:(\.(\s|\n))?)} $what -> bounds]
+
+    if {!$matched} { return false }
+
+    upvar 1 $startVar uStart $endVar uEnd
+    lassign $bounds uStart uEnd
+    return true
+}
+
+proc spot_juick_numbers {what at startVar endVar} {
+    set matched [regexp -indices -start $at -- \
+    {(?:\s|\n|\A|\(|\>)(#\d+(/\d+)?)(?:(\.(\s|\n))?)} $what -> bounds]
 
     if {!$matched} { return false }
 
@@ -171,6 +187,10 @@ proc spot_juick {what at startVar endVar} {
 
 proc process_juick {atLevel accName} {
 return [process $atLevel $accName juick]
+}
+
+proc process_juick_numbers {atLevel accName} {
+return [process $atLevel $accName juick_numbers]
 }
 
 proc process_citing {atLevel accName} {
@@ -261,11 +281,18 @@ proc render_juick_ligth {w type thing tags args} {
     return $id
 }
 
+::richtext::register_entity juick_numbers \
+    -configurator [namespace current]::configure_juick_numbers \
+    -parser [namespace current]::process_juick_numbers \
+    -renderer [namespace current]::render_juick \
+    -parser-priority 54
+
 ::richtext::register_entity juick_ligth \
     -configurator [namespace current]::configure_juick_ligth \
     -parser [namespace current]::process_juick_ligth \
     -renderer [namespace current]::render_juick_ligth \
     -parser-priority 81
+
 ::richtext::register_entity citing \
     -configurator [namespace current]::configure_citing \
     -parser [namespace current]::process_citing \
