@@ -137,7 +137,7 @@ proc configure_juick_numbers {w} {
 }
 
 proc configure_juick_ligth {w} {
-#    $w tag configure JLIGTH -foreground gray
+    $w tag configure JLIGTH -foreground blue
     $w tag configure JLIGTH -background #FF9A15
 }
 
@@ -147,7 +147,7 @@ proc configure_citing {w} {
 
 proc spot_juick_ligth {what at startVar endVar} {
     set matched [regexp -indices -start $at -- \
-    {(?:^Private message from @.+:\n)(.+$)} $what -> bounds]
+    {(^Private message)(?: from @.+:\n)} $what -> bounds]
 
     if {!$matched} { return false }
 
@@ -281,7 +281,7 @@ proc render_citing {w type thing tags args} {
 
 proc render_juick_ligth {w type thing tags args} {
     set id JLIGTH-$thing
-    $w insert end [append thing \n] [lfuse $tags [list $id $type JLIGTH]]
+    $w insert end $thing [lfuse $tags [list $id $type JLIGTH]]
     return $id
 }
 
