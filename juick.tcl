@@ -41,7 +41,6 @@ proc unload {} {
 # Determines whether given chatid correspond to Juick
 proc is_juick {chatid} {
     set jid [chat::get_jid $chatid]
-#    set jid [chat::get_jid [chat::winid_to_chatid [join [lrange [split $w .] 0 end-1] .]]]
     return [expr [cequal $jid "juick@juick.com/Juick"] || [regexp "juick%juick.com@.+/Juick" $jid]]
 }
 
@@ -80,6 +79,7 @@ proc insert_from_window {chatid w x y} {
     if {$thing == ""} return
 
     $ci insert insert "$thing "
+    focus -force $ci
     return stop
 }
 
@@ -105,7 +105,11 @@ proc copy_thing {w thing} {
 
 proc browse_thing {w thing} {
     switch -regexp -- $thing {
-        {^[#@]} {
+        {^#} {
+          regsub -- "/" [string range $thing 1 end] "#" jurl
+          browseurl http://juick.com/$jurl
+          }
+        {^@} {
           browseurl http://juick.com/[string range $thing 1 end]
           }
         {^\*} {
@@ -277,7 +281,7 @@ proc render_citing {w type thing tags args} {
 
 proc render_juick_ligth {w type thing tags args} {
     set id JLIGTH-$thing
-    $w insert end $thing [lfuse $tags [list $id $type JLIGTH]]
+    $w insert end [append thing \n] [lfuse $tags [list $id $type JLIGTH]]
     return $id
 }
 
