@@ -1,7 +1,14 @@
 package require msgcat
 
-namespace eval juick {
+option add *juick.nick			red		widgetDefault
+option add *juick.tag			ForestGreen	widgetDefault
+option add *juick.my			gray		widgetDefault
+option add *juick.number		blue		widgetDefault
+option add *juick.private_foreground	blue		widgetDefault
+option add *juick.private_background	#FF9A15		widgetDefault
+option add *juick.citing		gray35		widgetDefault
 
+namespace eval juick {
 ::msgcat::mcload [file join [file dirname [info script]] msgs]
 
 if {![::plugins::is_registered juick]} {
@@ -127,22 +134,33 @@ proc correct_command {chatid user body type} {
 # RichText stuff
 
 proc configure_juick {w} {
-    $w tag configure JNICK -foreground red
-    $w tag configure JTAG -foreground ForestGreen
-    $w tag configure JMY -foreground gray
+    set options(juick.nick) [option get $w juick.nick Text]
+    set options(juick.tag) [option get $w juick.tag Text]
+    set options(juick.my) [option get $w juick.my Text]
+
+    $w tag configure JNICK -foreground $options(juick.nick)
+    $w tag configure JTAG -foreground $options(juick.tag)
+    $w tag configure JMY -foreground $options(juick.my)
 }
 
 proc configure_juick_numbers {w} {
-    $w tag configure JNUM -foreground blue
+    set options(juick.number) [option get $w juick.number Text]
+
+    $w tag configure JNUM -foreground $options(juick.number)
 }
 
 proc configure_juick_ligth {w} {
-    $w tag configure JLIGTH -foreground blue
-    $w tag configure JLIGTH -background #FF9A15
+    set options(juick.private_foreground) [option get $w juick.private_foreground Text]
+    set options(juick.private_background) [option get $w juick.private_background Text]
+
+    $w tag configure JLIGTH -foreground $options(juick.private_foreground)
+    $w tag configure JLIGTH -background $options(juick.private_background)
 }
 
 proc configure_citing {w} {
-    $w tag configure CITING -foreground gray35
+    set options(juick.citing) [option get $w juick.citing Text]
+
+    $w tag configure CITING -foreground $options(juick.citing)
 }
 
 proc spot_juick_ligth {what at startVar endVar} {
