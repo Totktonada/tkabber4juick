@@ -1,6 +1,16 @@
 package require msgcat
 
+option add *juick.nick			red		widgetDefault
+option add *juick.tag			ForestGreen	widgetDefault
+option add *juick.my			gray		widgetDefault
+option add *juick.number		blue		widgetDefault
+option add *juick.private_foreground	blue		widgetDefault
+option add *juick.private_background	#FF9A15		widgetDefault
+option add *juick.citing		gray35		widgetDefault
+
 namespace eval juick {
+variable last_message_time 0
+variable last_private_time 0
 
 ::msgcat::mcload [file join [file dirname [info script]] msgs]
 
@@ -8,6 +18,7 @@ hook::add draw_message_hook [namespace current]::ignore_server_messages 0
 hook::add draw_message_hook [namespace current]::handle_message 21
 hook::add chat_window_click_hook [namespace current]::insert_from_window
 hook::add chat_win_popup_menu_hook [namespace current]::add_juick_things_menu 20
+hook::add chat_send_message_hook [namespace current]::delay_send 11
 
 # Determines whether given chatid correspond to Juick
 proc is_juick {chatid} {
@@ -29,6 +40,38 @@ proc handle_message {chatid from type body x} {
         ::richtext::render_message $chatw $body $tags
         return stop
     }
+}
+
+proc send_by_timeout {var_last_send_time run_cmd} {
+      upvar $var_last_send_time last_send_time
+
+      if {$last_send_time != 0} {
+         set wait_time [expr $last_send_time+10001-[clock clicks -milliseconds]]
+         if {$wait_time > 0} {
+            after $wait_time $run_cmd
+            return stop;
+         }
+      }
+
+      set last_send_time [clock clicks -milliseconds]
+      return;
+}
+
+proc delay_send {chatid user body type} {
+    variable last_message_time
+    variable last_private_time
+
+    if {[is_juick $chatid]} {
+       set run_cmd [list hook::run chat_send_message_hook $chatid $user $body $type]
+
+       if {[regexp {#(\d+)(\d+)?[ ]+[^ ]?.*} $body]} {
+          return [send_by_timeout last_message_time $run_cmd];
+       } elseif {[regexp {PM @[^ ]+[ ]+[^ ]?.*} $body]} {
+          return [send_by_timeout last_private_time $run_cmd];
+       }
+    }
+
+    return;
 }
 
 proc ignore_server_messages {chatid from type body x} {
@@ -98,22 +141,33 @@ proc correct_command {chatid user body type} {
 # RichText stuff
 
 proc configure_juick {w} {
-    $w tag configure JNICK -foreground red
-    $w tag configure JTAG -foreground ForestGreen
-    $w tag configure JMY -foreground gray
+    set options(juick.nick) [option get $w juick.nick Text]
+    set options(juick.tag) [option get $w juick.tag Text]
+    set options(juick.my) [option get $w juick.my Text]
+
+    $w tag configure JNICK -foreground $options(juick.nick)
+    $w tag configure JTAG -foreground $options(juick.tag)
+    $w tag configure JMY -foreground $options(juick.my)
 }
 
 proc configure_juick_numbers {w} {
-    $w tag configure JNUM -foreground blue
+    set options(juick.number) [option get $w juick.number Text]
+
+    $w tag configure JNUM -foreground $options(juick.number)
 }
 
 proc configure_juick_ligth {w} {
-    $w tag configure JLIGTH -foreground blue
-    $w tag configure JLIGTH -background #FF9A15
+    set options(juick.private_foreground) [option get $w juick.private_foreground Text]
+    set options(juick.private_background) [option get $w juick.private_background Text]
+
+    $w tag configure JLIGTH -foreground $options(juick.private_foreground)
+    $w tag configure JLIGTH -background $options(juick.private_background)
 }
 
 proc configure_citing {w} {
-    $w tag configure CITING -foreground gray35
+    set options(juick.citing) [option get $w juick.citing Text]
+
+    $w tag configure CITING -foreground $options(juick.citing)
 }
 
 proc spot_juick_ligth {what at startVar endVar} {
