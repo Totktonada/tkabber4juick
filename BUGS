@@ -1,4 +1,5 @@
-# You can report about all bugs this plugin via jabber: totktonada@totktonada.ru
+# You can report about all bugs this plugin via jabber: totktonada@totktonada.ru.
 # Mathed: "-". Fixed: "+".
 
 - Citate with smile in middle.
+- Random order of sending cached messages and PM.
