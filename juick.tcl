@@ -64,7 +64,7 @@ proc delay_send {chatid user body type} {
     if {[is_juick $chatid]} {
        set run_cmd [list hook::run chat_send_message_hook $chatid $user $body $type]
 
-       if {[regexp {^#(\d+)(\d+)?[ ]+[^ ]?.*} $body]} {
+       if {[regexp {^#\d+(/\d+)?[ ]+[^ ]?.*} $body]} {
           return [send_by_timeout last_message_time $run_cmd];
        } elseif {[regexp {^PM @[^ ]+[ ]+[^ ]?.*} $body]} {
           return [send_by_timeout last_private_time $run_cmd];
