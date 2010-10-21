@@ -9,9 +9,6 @@ option add *juick.private_background	#FF9A15		widgetDefault
 option add *juick.citing		gray35		widgetDefault
 
 namespace eval juick {
-variable last_message_time 0
-variable last_private_time 0
-
 ::msgcat::mcload [file join [file dirname [info script]] msgs]
 
 if {![::plugins::is_registered juick]} {
