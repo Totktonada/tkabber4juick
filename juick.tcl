@@ -9,16 +9,12 @@ option add *juick.private_background	#FF9A15		widgetDefault
 option add *juick.citing		gray35		widgetDefault
 
 namespace eval juick {
-variable last_message_time 0
-variable last_private_time 0
-
 ::msgcat::mcload [file join [file dirname [info script]] msgs]
 
 hook::add draw_message_hook [namespace current]::ignore_server_messages 0
 hook::add draw_message_hook [namespace current]::handle_message 21
 hook::add chat_window_click_hook [namespace current]::insert_from_window
 hook::add chat_win_popup_menu_hook [namespace current]::add_juick_things_menu 20
-hook::add chat_send_message_hook [namespace current]::delay_send 11
 
 # Determines whether given chatid correspond to Juick
 proc is_juick {chatid} {
@@ -40,38 +36,6 @@ proc handle_message {chatid from type body x} {
         ::richtext::render_message $chatw $body $tags
         return stop
     }
-}
-
-proc send_by_timeout {var_last_send_time run_cmd} {
-      upvar $var_last_send_time last_send_time
-
-      if {$last_send_time != 0} {
-         set wait_time [expr $last_send_time+10001-[clock clicks -milliseconds]]
-         if {$wait_time > 0} {
-            after $wait_time $run_cmd
-            return stop;
-         }
-      }
-
-      set last_send_time [clock clicks -milliseconds]
-      return;
-}
-
-proc delay_send {chatid user body type} {
-    variable last_message_time
-    variable last_private_time
-
-    if {[is_juick $chatid]} {
-       set run_cmd [list hook::run chat_send_message_hook $chatid $user $body $type]
-
-       if {[regexp {^#\d+(/\d+)?[ ]+[^ ]?.*} $body]} {
-          return [send_by_timeout last_message_time $run_cmd];
-       } elseif {[regexp {^PM @[^ ]+[ ]+[^ ]?.*} $body]} {
-          return [send_by_timeout last_private_time $run_cmd];
-       }
-    }
-
-    return;
 }
 
 proc ignore_server_messages {chatid from type body x} {
