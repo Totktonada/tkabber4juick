@@ -103,6 +103,20 @@ proc add_juick_things_menu {m chatwin X Y x y} {
           -command [list [namespace current]::copy_thing $chatwin $thing]
     $m add command -label [::msgcat::mc "\[J\] Open thing in browser."] \
           -command [list [namespace current]::browse_thing $chatwin $thing]
+    if {[regexp {#\d+$} $thing]} {
+        $m add command -label [::msgcat::mc "\[J\] Subscribe to $thing replies."] \
+              -command [list [namespace current]::subscribe_to $chatwin $thing]
+    }
+}
+
+proc subscribe_to {w thing} {
+     set cw [join [lrange [split $w .] 0 end-1] .]
+     set chatid [chat::winid_to_chatid $cw]
+     set xlib [chat::get_xlib $chatid]
+     set jid [chat::get_jid $chatid]
+     set body "S $thing"
+
+     message::send_msg $xlib $jid -type chat -body $body
 }
 
 proc copy_thing {w thing} {
