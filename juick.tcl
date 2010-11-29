@@ -31,6 +31,9 @@ proc load {} {
     hook::add draw_message_hook [namespace current]::handle_message 21
     hook::add chat_window_click_hook [namespace current]::insert_from_window
     hook::add chat_win_popup_menu_hook [namespace current]::add_juick_things_menu 20
+
+    hook::add draw_message_hook [namespace current]::update_juick_tab 8
+    hook::remove draw_message_hook ::plugins::update_tab::update 8
 }
 
 proc unload {} {
@@ -38,6 +41,9 @@ proc unload {} {
     hook::remove draw_message_hook [namespace current]::handle_message 21
     hook::remove chat_window_click_hook [namespace current]::insert_from_window
     hook::remove chat_win_popup_menu_hook [namespace current]::add_juick_things_menu 20
+
+    hook::remove draw_message_hook [namespace current]::update_juick_tab 8
+    hook::add draw_message_hook ::plugins::update_tab::update 8
 
     ::richtext::entity_state juick_numbers 0
     ::richtext::entity_state citing 0
@@ -64,6 +70,29 @@ proc handle_message {chatid from type body x} {
 
         ::richtext::render_message $chatw $body $tags
         return stop
+    }
+}
+
+proc update_juick_tab {chatid from type body x} {
+    if {![is_juick $chatid] || ![cequal $type "chat"]} {
+        ::plugins::update_tab::update $chatid $from $type $body $x
+        return
+    }
+
+    # See ${PATH_TO_TKABBER}/plugins/chat/update_tab.tcl
+    foreach xelem $x {
+        ::xmpp::xml::split $xelem tag xmlns attrs cdata subels
+        if {[string equal $tag ""] && [string equal $xmlns tkabber:x:nolog]} {
+            return
+        }
+    }
+
+    set cw [chat::winid $chatid]
+
+    if {[regexp {^Private message from @.+:\n} $body]} {
+        tab_set_updated $cw 1 mesg_to_user
+    } else {
+        tab_set_updated $cw 1 message
     }
 }
 
