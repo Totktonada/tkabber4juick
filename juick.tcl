@@ -27,10 +27,11 @@ proc load {} {
     ::richtext::entity_state juick 1
     ::richtext::entity_state juick_ligth 1
 
-    hook::add draw_message_hook [namespace current]::ignore_server_messages 0
-    hook::add draw_message_hook [namespace current]::handle_message 21
-    hook::add chat_window_click_hook [namespace current]::insert_from_window
+    hook::add draw_message_hook        [namespace current]::ignore_server_messages 0
+    hook::add draw_message_hook        [namespace current]::handle_message 21
+    hook::add chat_window_click_hook   [namespace current]::insert_from_window
     hook::add chat_win_popup_menu_hook [namespace current]::add_juick_things_menu 20
+    hook::add chat_send_message_hook   [namespace current]::rewrite_send_juick_message 19
 
     hook::add draw_message_hook [namespace current]::update_juick_tab 8
     hook::remove draw_message_hook ::plugins::update_tab::update 8
@@ -40,10 +41,11 @@ proc load {} {
 }
 
 proc unload {} {
-    hook::remove draw_message_hook [namespace current]::ignore_server_messages 0
-    hook::remove draw_message_hook [namespace current]::handle_message 21
-    hook::remove chat_window_click_hook [namespace current]::insert_from_window
+    hook::remove draw_message_hook        [namespace current]::ignore_server_messages 0
+    hook::remove draw_message_hook        [namespace current]::handle_message 21
+    hook::remove chat_window_click_hook   [namespace current]::insert_from_window
     hook::remove chat_win_popup_menu_hook [namespace current]::add_juick_things_menu 20
+    hook::remove chat_send_message_hook   [namespace current]::rewrite_send_juick_message 19
 
     hook::remove draw_message_hook [namespace current]::update_juick_tab 8
     hook::add draw_message_hook ::plugins::update_tab::update 8
@@ -138,18 +140,22 @@ proc add_number_of_messages_from_juick_to_title {chatid from type body x} {
     ::ifacetk::update_main_window_title
 }
 
-#proc rewrite_message \
-#     {vxlib vfrom vid vtype vis_subject vsubject \
-#      vbody verr vthread vpriority vx} {
-#    upvar 2 $vfrom from
-#    upvar 2 $vtype type
-#
-#    foreach xe $x {
-#        ::xmpp::xml::split $xe tag xmlns attrs cdata subels
-#
-#        switch -- $xmlns
-#        }
-#}
+proc rewrite_send_juick_message {chatid user body type} {
+    if {![is_juick $chatid] || ![cequal $type "chat"]} {
+        return
+    }
+
+    if {[regexp {^S (#\d+)\+\s*$} $body -> thing]} {
+        set xlib [chat::get_xlib $chatid]
+        set jid [chat::get_jid $chatid]
+
+        chat::add_message $chatid $user $type $body {}
+        message::send_msg $xlib $jid -type chat -body "S $thing"
+        message::send_msg $xlib $jid -type chat -body "$thing+"
+
+        return stop
+    }
+}
 
 proc insert_from_window {chatid w x y} {
     set thing ""
