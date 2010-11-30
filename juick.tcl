@@ -34,6 +34,9 @@ proc load {} {
 
     hook::add draw_message_hook [namespace current]::update_juick_tab 8
     hook::remove draw_message_hook ::plugins::update_tab::update 8
+
+    hook::add draw_message_hook [namespace current]::add_number_of_messages_from_juick_to_title 18
+    hook::remove draw_message_hook ::::ifacetk::add_number_of_messages_to_title 18
 }
 
 proc unload {} {
@@ -44,6 +47,9 @@ proc unload {} {
 
     hook::remove draw_message_hook [namespace current]::update_juick_tab 8
     hook::add draw_message_hook ::plugins::update_tab::update 8
+
+    hook::remove draw_message_hook [namespace current]::add_number_of_messages_from_juick_to_title 18
+    hook::add draw_message_hook ::::ifacetk::add_number_of_messages_to_title 18
 
     ::richtext::entity_state juick_numbers 0
     ::richtext::entity_state citing 0
@@ -101,6 +107,49 @@ proc ignore_server_messages {chatid from type body x} {
         return stop;
     }
 }
+
+proc add_number_of_messages_from_juick_to_title {chatid from type body x} {
+    if {![is_juick $chatid] || ![cequal $type "chat"]} {
+        ::ifacetk::add_number_of_messages_to_title $chatid $from $type $body $x
+        return
+    }
+
+    # See ${PATH_TO_TKABBER}/ifacetk/iface.tcl
+    foreach xelem $x {
+        ::xmpp::xml::split $xelem tag xmlns attrs cdata subels
+        if {[string equal $tag ""] && [string equal $xmlns tkabber:x:nolog]} {
+            return
+        }
+    }
+
+    if {[::ifacetk::chat_window_is_active $chatid]} return
+    if {$from == ""} return
+
+    variable ::ifacetk::number_msg
+    variable ::ifacetk::personal_msg
+
+    incr number_msg($chatid)
+
+    if {[regexp {^Private message from @.+:\n} $body]} {
+        incr personal_msg($chatid)
+    }
+
+    ::ifacetk::update_chat_title $chatid
+    ::ifacetk::update_main_window_title
+}
+
+#proc rewrite_message \
+#     {vxlib vfrom vid vtype vis_subject vsubject \
+#      vbody verr vthread vpriority vx} {
+#    upvar 2 $vfrom from
+#    upvar 2 $vtype type
+#
+#    foreach xe $x {
+#        ::xmpp::xml::split $xe tag xmlns attrs cdata subels
+#
+#        switch -- $xmlns
+#        }
+#}
 
 proc insert_from_window {chatid w x y} {
     set thing ""
