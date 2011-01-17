@@ -9,6 +9,7 @@ option add *juick.private_background	#FF9A15		widgetDefault
 option add *juick.citing		gray35		widgetDefault
 
 namespace eval juick {
+variable options
 ::msgcat::mcload [file join [file dirname [info script]] msgs]
 
 if {![::plugins::is_registered juick]} {
@@ -21,6 +22,26 @@ if {![::plugins::is_registered juick]} {
     return
     }
 
+        custom::defgroup Plugins [::msgcat::mc "Plugins options."] -group Tkabber
+
+        set group "Juick"
+
+        custom::defgroup $group \
+                [::msgcat::mc "Juick settings."] \
+                -group Plugins
+        custom::defvar options(juick_jids) "juick@juick.com/Juick" \
+                [::msgcat::mc "List of JIDs we treated as Juick JIDs."] \
+                -group $group \
+                -type string
+        custom::defvar options(main_jid) "juick@juick.com/Juick" \
+                [::msgcat::mc "Main Juick JID used for forwarding things from supplementary bots"] \
+                -group $group \
+                -type string
+        custom::defvar options(juick_bots) "jubo@nologin.ru/jubo" \
+                [::msgcat::mc "Forward things from this list of JIDs to Main Juick JID."] \
+                -group $group \
+                -type string
+
 proc load {} {
     ::richtext::entity_state juick_numbers 1
     ::richtext::entity_state citing 1
@@ -31,6 +52,7 @@ proc load {} {
     hook::add draw_message_hook        [namespace current]::handle_message 21
     hook::add chat_window_click_hook   [namespace current]::insert_from_window
     hook::add chat_win_popup_menu_hook [namespace current]::add_juick_things_menu 20
+    hook::add rewrite_message_hook     [namespace current]::rewrite_juick_message 20
     hook::add chat_send_message_hook   [namespace current]::rewrite_send_juick_message 19
 
     hook::add draw_message_hook [namespace current]::update_juick_tab 8
@@ -45,6 +67,7 @@ proc unload {} {
     hook::remove draw_message_hook        [namespace current]::handle_message 21
     hook::remove chat_window_click_hook   [namespace current]::insert_from_window
     hook::remove chat_win_popup_menu_hook [namespace current]::add_juick_things_menu 20
+    hook::remove rewrite_message_hook     [namespace current]::rewrite_juick_message 20
     hook::remove chat_send_message_hook   [namespace current]::rewrite_send_juick_message 19
 
     hook::remove draw_message_hook [namespace current]::update_juick_tab 8
@@ -61,8 +84,11 @@ proc unload {} {
 
 # Determines whether given chatid correspond to Juick
 proc is_juick {chatid} {
+    variable options
     set jid [chat::get_jid $chatid]
-    return [expr [cequal $jid "juick@juick.com/Juick"] || [regexp "juick%juick.com@.+/Juick" $jid]]
+    set accept_list [split $options(juick_jids) " "]
+    return [expr [lsearch -exact $accept_list $jid] >= 0]
+#    return [expr [cequal $jid "juick@juick.com/Juick"] || [regexp "juick%juick.com@.+/Juick" $jid]]
 }
 
 proc handle_message {chatid from type body x} {
@@ -140,12 +166,32 @@ proc add_number_of_messages_from_juick_to_title {chatid from type body x} {
     ::ifacetk::update_main_window_title
 }
 
+proc rewrite_juick_message \
+     {vxlib vfrom vid vtype vis_subject vsubject \
+      vbody verr vthread vpriority vx} {
+    upvar 2 $vbody body
+    upvar 2 $vx x
+
+    foreach xe $x {
+        ::xmpp::xml::split $xe tag xmlns attrs cdata subels
+
+        if {[cequal $xmlns "http://juick.com/message"]} {
+            foreach {key val} $attrs {
+                if {[cequal $key "ts"]} {
+                    set body "$val GMT\n$body"
+                }
+            }
+        }
+    }
+}
+
 proc rewrite_send_juick_message {chatid user body type} {
     if {![is_juick $chatid] || ![cequal $type "chat"]} {
         return
     }
 
-    if {[regexp {^S (#\d+)\+\s*$} $body -> thing]} {
+#    if {[regexp {^S (#\d+)\+\s*$} $body -> thing]} { }
+    if {[regexp {^S (#\S+)\+\s*$} $body -> thing]} {
         set xlib [chat::get_xlib $chatid]
         set jid [chat::get_jid $chatid]
 
@@ -158,9 +204,20 @@ proc rewrite_send_juick_message {chatid user body type} {
 }
 
 proc insert_from_window {chatid w x y} {
+    variable options
     set thing ""
     set cw [chat::chat_win $chatid]
-    set ci [chat::input_win $chatid]
+#    set ci [chat::input_win $chatid]
+
+    set jid [chat::get_jid $chatid]
+    set forward_list [split $options(juick_bots) " "]
+    if {[lsearch -exact $forward_list $jid] >= 0} {
+        set mainchat [list [chat::get_xlib $chatid] $options(main_jid)]
+        chat::activate $mainchat
+        set ci [chat::input_win $mainchat]
+    } else {
+        set ci [chat::input_win $chatid]
+    }
     set tags [$cw tag names "@$x,$y"]
 
     if {[set idx [lsearch -glob $tags JUICK-*]] >= 0} {
@@ -296,7 +353,8 @@ proc spot_juick {what at startVar endVar} {
 
 proc spot_juick_numbers {what at startVar endVar} {
     set matched [regexp -indices -start $at -- \
-    {(?:\s|\n|\A|\(|\>)(#\d+(/\d+)?)(?:(\.(\s|\n))?)} $what -> bounds]
+    {(?:\s|\n|\A|\(|\>)(#\S+(/\d+)?)(?:(\.(\s|\n))?)} $what -> bounds]
+#    {(?:\s|\n|\A|\(|\>)(#\d+(/\d+)?)(?:(\.(\s|\n))?)} $what -> bounds]
 
     if {!$matched} { return false }
 
