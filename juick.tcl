@@ -82,12 +82,16 @@ proc unload {} {
     ::richtext::entity_state juick_ligth 0
 }
 
-# Determines whether given chatid correspond to Juick
-proc is_juick {chatid} {
+proc is_juick_jid {jid} {
     variable options
-    set jid [chat::get_jid $chatid]
     set accept_list [split $options(juick_jids) " "]
     return [expr [lsearch -exact $accept_list $jid] >= 0]
+}
+
+# Determines whether given chatid correspond to Juick
+proc is_juick {chatid} {
+    set jid [chat::get_jid $chatid]
+    return [is_juick_jid $jid]
 #    return [expr [cequal $jid "juick@juick.com/Juick"] || [regexp "juick%juick.com@.+/Juick" $jid]]
 }
 
@@ -169,9 +173,31 @@ proc add_number_of_messages_from_juick_to_title {chatid from type body x} {
 proc rewrite_juick_message \
      {vxlib vfrom vid vtype vis_subject vsubject \
       vbody verr vthread vpriority vx} {
+    upvar 2 $vfrom from
+    upvar 2 $vtype type
     upvar 2 $vbody body
     upvar 2 $vx x
 
+    if {![is_juick_jid $from] || ![cequal $type "chat"]} {
+        return
+    }
+
+#############################
+# Remove jabber:x:oob element
+    set newx {}
+
+    foreach xe $x {
+        ::xmpp::xml::split $xe tag xmlns attrs cdata subels
+
+        if {![cequal $xmlns "jabber:x:oob"]} {
+            lappend newx $xe
+        }
+    }
+
+    set x $newx
+
+#############################
+# Add GMT time
     foreach xe $x {
         ::xmpp::xml::split $xe tag xmlns attrs cdata subels
 
