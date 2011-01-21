@@ -34,13 +34,17 @@ if {![::plugins::is_registered juick]} {
                 -group $group \
                 -type string
         custom::defvar options(main_jid) "juick@juick.com/Juick" \
-                [::msgcat::mc "Main Juick JID used for forwarding things from supplementary bots"] \
+                [::msgcat::mc "Main Juick JID used for forwarding things from supplementary bots."] \
                 -group $group \
                 -type string
         custom::defvar options(juick_bots) "jubo@nologin.ru/jubo" \
                 [::msgcat::mc "Forward things from this list of JIDs to Main Juick JID."] \
                 -group $group \
                 -type string
+        custom::defvar options(special_update_juick_tab) 1 \
+                [::msgcat::mc "Only PM and reply to your comments is personal message."] \
+                -group $group \
+                -type boolean
 
 proc load {} {
     ::richtext::entity_state juick_numbers 1
@@ -112,7 +116,8 @@ proc handle_message {chatid from type body x} {
 }
 
 proc update_juick_tab {chatid from type body x} {
-    if {![is_juick $chatid] || ![cequal $type "chat"]} {
+    variable options
+    if {![expr [is_juick $chatid] && [cequal $type "chat"] && $options(special_update_juick_tab)]} {
         ::plugins::update_tab::update $chatid $from $type $body $x
         return
     }
@@ -141,7 +146,8 @@ proc ignore_server_messages {chatid from type body x} {
 }
 
 proc add_number_of_messages_from_juick_to_title {chatid from type body x} {
-    if {![is_juick $chatid] || ![cequal $type "chat"]} {
+    variable options
+    if {![expr [is_juick $chatid] && [cequal $type "chat"] && $options(special_update_juick_tab)]} {
         ::ifacetk::add_number_of_messages_to_title $chatid $from $type $body $x
         return
     }
