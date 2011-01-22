@@ -1,3 +1,6 @@
 ::msgcat::mcset ru "\[J\] Copy thing to clipboard." "\[J\] Скопировать сущность в буфер обмена."
 ::msgcat::mcset ru "Whether the Juick plugin is loaded." "Загружено ли расширение для удобной работы с Juick."
 ::msgcat::mcset ru "\[J\] Open thing in browser." "\[J\] Открыть сущность в браузере."
+::msgcat::mcset ru "Juick settings." "Параметры расширения для удобной работы с Juick"
+::msgcat::mcset ru "Main Juick JID. This used for forwarding things from other chats." "Главный JID Juick'а. Используется для перенаправления сущностей из других чатов."
+::msgcat::mcset ru "Only private messages and replies to your comments is personal message." "Только приватные сообщения и ответы на ваши комментарии являются персональными сообщениями."
