@@ -320,9 +320,15 @@ proc insert_from_window {chatid w x y} {
     if {$thing == ""} return
 
     if {![is_juick_jid $jid]} {
-        #set mainchat_jid [::xmpp::jid::removeResource $options(main_jid)]
-        set mainchat [list [chat::get_xlib $chatid] $options(main_jid)]
-        chat::activate $mainchat
+        set xlib [chat::get_xlib $chatid]
+        set mainchat [chat::chatid $xlib $options(main_jid)]
+
+        if {[chat::is_opened $mainchat]} {
+            chat::activate $mainchat
+        } else {
+            chat::open_to_user $xlib $options(main_jid)
+        }
+
         set ci [chat::input_win $mainchat]
     }
 
