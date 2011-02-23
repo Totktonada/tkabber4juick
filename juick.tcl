@@ -445,13 +445,32 @@ proc juick_commands_comps {chatid compsvar wordstart line} {
     variable commands
 
     if {!$wordstart} {
-        set comps [concat $commands $chat_things($chatid) $comps]
+       set comps [concat $commands $comps]
     } else {
-        set comps [concat $chat_things($chatid) $comps]
+if {0} {
+        # This code don't work.
+        # See ${PATH_TO_TKABBER}/plugins/chat/completion.tcl at line 94.
+        # Idea: use *rename* for procedure completion::complete.
+        set q 0
+        foreach cmd $commands {
+            if {[string equal -length [string length $cmd] $cmd $line]} {
+                set q 1
+                break
+            }
+	    }
+
+        if {!$q} return
+}
+    }
+
+    if {[info exist chat_things($chatid)]} {
+       set comps [concat $chat_things($chatid) $comps]
     }
 }
 
-variable commands {HELP NICK LOGIN S U ON OFF D BL WL PM VCARD PING INVITE}
+# See commented code in juick_commands_comps.
+#variable commands {HELP NICK LOGIN "S " "U " ON OFF "D " "BL " "WL " "PM " VCARD PING INVITE}
+variable commands {HELP NICK LOGIN S U ON OFF D BL WL PM CARD PING INVITE}
 proc correct_command {chatid user body type} {
    # Maybe once I'll get arount to it 
 }
