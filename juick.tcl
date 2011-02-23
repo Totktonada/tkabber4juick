@@ -11,6 +11,7 @@ option add *juick.citing		gray35		widgetDefault
 namespace eval juick {
 variable options
 variable juick_nicknames
+variable chat_things
 
 ::msgcat::mcload [file join [file dirname [info script]] msgs]
 
@@ -60,6 +61,7 @@ proc load {} {
     hook::remove draw_message_hook ::::ifacetk::add_number_of_messages_to_title 18
 
     hook::add roster_push_hook [namespace current]::request_juick_nick 99
+    hook::add generate_completions_hook [namespace current]::juick_commands_comps 99
 }
 
 proc unload {} {
@@ -77,6 +79,7 @@ proc unload {} {
     hook::add draw_message_hook ::::ifacetk::add_number_of_messages_to_title 18
 
     hook::remove roster_push_hook [namespace current]::request_juick_nick 99
+    hook::remove generate_completions_hook [namespace current]::juick_commands_comps 99
 
     ::richtext::entity_state juick_numbers 0
     ::richtext::entity_state citing 0
@@ -353,17 +356,65 @@ proc add_juick_things_menu {m chatwin X Y x y} {
     if {[regexp {#\d+$} $thing]} {
         $m add command -label [::msgcat::mc "\[J\] Subscribe to $thing replies."] \
               -command [list [namespace current]::subscribe_to $chatwin $thing]
+        $m add command -label [::msgcat::mc "\[J\] Open thread in new tab."] \
+              -command [list [namespace current]::get_juick_thread $chatwin $thing]
     }
 }
 
 proc subscribe_to {w thing} {
-     set cw [join [lrange [split $w .] 0 end-1] .]
-     set chatid [chat::winid_to_chatid $cw]
-     set xlib [chat::get_xlib $chatid]
-     set jid [chat::get_jid $chatid]
-     set body "S $thing"
+    set cw [join [lrange [split $w .] 0 end-1] .]
+    set chatid [chat::winid_to_chatid $cw]
+    set xlib [chat::get_xlib $chatid]
+    set jid [chat::get_jid $chatid]
+    set body "S $thing"
 
-     message::send_msg $xlib $jid -type chat -body $body
+    message::send_msg $xlib $jid -type chat -body $body
+}
+
+proc get_juick_thread {w thing} {
+    set cw [join [lrange [split $w .] 0 end-1] .]
+    set chatid [chat::winid_to_chatid $cw]
+    set xlib [chat::get_xlib $chatid]
+    set jid [chat::get_jid $chatid]
+    set mid [string range $thing 1 end]
+
+    ::xmpp::sendIQ $xlib get \
+        -query [::xmpp::xml::create query \
+            -xmlns "http://juick.com/query#messages" \
+            -attrs [list mid $mid]] \
+        -to $jid \
+        -command [list [namespace current]::receive_juick_thread $jid]
+}
+
+proc receive_juick_thread {jid res child0} {
+    if {![string equal $res ok]} return
+
+    ::xmpp::xml::split $child0 tag0 xmlns0 attrs0 cdata0 subels0
+
+    if {![cequal $xmlns0 "http://juick.com/query#messages"]} return
+
+    set child1 [lindex $subels0 0]
+    ::xmpp::xml::split $child1 tag1 xmlns1 attrs1 cdata1 subels1
+
+    if {![cequal $xmlns1 "http://juick.com/message"]} return
+
+    set msg ""
+
+    foreach child2 $subels1 {
+        ::xmpp::xml::split $child2 tag2 xmlns2 attrs2 cdata2 subels2
+        switch -- $tag2 {
+            body {
+                set msg $cdata2
+            }
+        }
+    }
+
+    puts "Get message from $jid: \"$msg\""
+
+    # open new tab
+    
+
+    return
 }
 
 proc copy_thing {w thing} {
@@ -383,6 +434,20 @@ proc browse_thing {w thing} {
         {^\*} {
           browseurl http://juick.com/last?tag=[string range $thing 1 end]
           }
+    }
+}
+
+proc juick_commands_comps {chatid compsvar wordstart line} {
+    if {![is_juick $chatid]} return
+
+    upvar 0 $compsvar comps
+    variable chat_things
+    variable commands
+
+    if {!$wordstart} {
+        set comps [concat $commands $chat_things($chatid) $comps]
+    } else {
+        set comps [concat $chat_things($chatid) $comps]
     }
 }
 
@@ -551,6 +616,17 @@ proc render_juick {w type thing tags args} {
                set type JLIGTH
            }
     }
+
+#################
+            variable chat_things
+            set cw [join [lrange [split $w .] 0 end-1] .]
+            set chatid [chat::winid_to_chatid $cw]
+            if {![info exist chat_things($chatid)]} {
+                set chat_things($chatid) [list $thing]
+            } else {
+                set chat_things($chatid) [linsert $chat_things($chatid) 0 $thing]
+            }
+#################
 
     set id JUICK-$thing
     $w insert end $thing [lfuse $tags [list $id $type JUICK]]
