@@ -437,6 +437,13 @@ proc browse_thing {w thing} {
     }
 }
 
+# See commented code in juick_commands_comps.
+#variable commands {HELP NICK LOGIN "S " "U " ON OFF "D " "BL " "WL " "PM " VCARD PING INVITE}
+variable commands {HELP NICK LOGIN S U ON OFF D BL WL PM CARD PING INVITE}
+proc correct_command {chatid user body type} {
+   # Maybe once I'll get arount to it 
+}
+
 proc juick_commands_comps {chatid compsvar wordstart line} {
     if {![is_juick $chatid]} return
 
@@ -466,13 +473,6 @@ if {0} {
     if {[info exist chat_things($chatid)]} {
        set comps [concat $chat_things($chatid) $comps]
     }
-}
-
-# See commented code in juick_commands_comps.
-#variable commands {HELP NICK LOGIN "S " "U " ON OFF "D " "BL " "WL " "PM " VCARD PING INVITE}
-variable commands {HELP NICK LOGIN S U ON OFF D BL WL PM CARD PING INVITE}
-proc correct_command {chatid user body type} {
-   # Maybe once I'll get arount to it 
 }
 
 # --------------
