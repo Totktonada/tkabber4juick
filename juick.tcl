@@ -8,6 +8,21 @@ option add *juick.private_foreground	blue		widgetDefault
 option add *juick.private_background	#FF9A15		widgetDefault
 option add *juick.citing		gray35		widgetDefault
 
+# ==== Tkabber-0.11.1 compatibility. ====
+
+proc ::hook::remove {hook func {seq 50}} {
+    variable $hook
+
+    set idx [lsearch -exact [set $hook] [list $func $seq]]
+    set $hook [lreplace [set $hook] $idx $idx]
+}
+
+proc ::chat::get_xlib {chatid} {
+    ::chat::get_connid $chatid
+}
+
+# =======================================
+
 namespace eval juick {
 ::msgcat::mcload [file join [file dirname [info script]] msgs]
 
@@ -53,8 +68,10 @@ proc update_juick_tab {chatid from type body x} {
 
     # See ${PATH_TO_TKABBER}/plugins/chat/update_tab.tcl
     foreach xelem $x {
-        ::xmpp::xml::split $xelem tag xmlns attrs cdata subels
-        if {[string equal $tag ""] && [string equal $xmlns tkabber:x:nolog]} {
+        jlib::wrapper:splitxml $xelem tag vars isempty chdata children
+        if {[cequal $tag ""] \
+            && [cequal [jlib::wrapper:getattr $vars xmlns] tkabber:x:nolog]} \
+        {
             return
         }
     }
@@ -82,8 +99,10 @@ proc add_number_of_messages_from_juick_to_title {chatid from type body x} {
 
     # See ${PATH_TO_TKABBER}/ifacetk/iface.tcl
     foreach xelem $x {
-        ::xmpp::xml::split $xelem tag xmlns attrs cdata subels
-        if {[string equal $tag ""] && [string equal $xmlns tkabber:x:nolog]} {
+        jlib::wrapper:splitxml $xelem tag vars isempty chdata children
+        if {[cequal $tag ""] \
+            && [cequal [jlib::wrapper:getattr $vars xmlns] tkabber:x:nolog]} \
+        {
             return
         }
     }
@@ -114,8 +133,8 @@ proc rewrite_send_juick_message {chatid user body type} {
         set jid [chat::get_jid $chatid]
 
         chat::add_message $chatid $user $type $body {}
-        message::send_msg $xlib $jid -type chat -body "S $thing"
-        message::send_msg $xlib $jid -type chat -body "$thing+"
+        message::send_msg $jid -connection $xlib -type chat -body "S $thing"
+        message::send_msg $jid -connection $xlib -type chat -body "$thing+"
 
         return stop
     }
