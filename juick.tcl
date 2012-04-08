@@ -1,12 +1,12 @@
 package require msgcat
 
-option add *juick.nick			red		widgetDefault
-option add *juick.tag			ForestGreen	widgetDefault
-option add *juick.my			gray		widgetDefault
-option add *juick.number		blue		widgetDefault
-option add *juick.private_foreground	blue		widgetDefault
-option add *juick.private_background	#FF9A15		widgetDefault
-option add *juick.citing		gray35		widgetDefault
+option add *juick.nick                  red            widgetDefault
+option add *juick.tag                   ForestGreen    widgetDefault
+option add *juick.my                    gray           widgetDefault
+option add *juick.number                blue           widgetDefault
+option add *juick.private_foreground    blue           widgetDefault
+option add *juick.private_background    #FF9A15        widgetDefault
+option add *juick.citing                gray35         widgetDefault
 
 # ==== Tkabber-0.11.1 compatibility. ====
 
