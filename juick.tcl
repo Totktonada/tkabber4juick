@@ -23,23 +23,23 @@ if {![::plugins::is_registered juick]} {
               -loadcommand [namespace code load] \
               -unloadcommand [namespace code unload]
     return
-    }
+}
 
-        custom::defgroup Plugins [::msgcat::mc "Plugins options."] -group Tkabber
+custom::defgroup Plugins [::msgcat::mc "Plugins options."] -group Tkabber
 
-        set group "Juick"
-        custom::defgroup $group \
-                [::msgcat::mc "Juick settings."] \
-                -group Plugins
+set group "Juick"
+custom::defgroup $group \
+        [::msgcat::mc "Juick settings."] \
+        -group Plugins
 
-        custom::defvar options(main_jid) "juick@juick.com/Juick" \
-                [::msgcat::mc "Main Juick JID. This used for forwarding things from other chats."] \
-                -group $group \
-                -type string
-        custom::defvar options(special_update_juick_tab) 1 \
-                [::msgcat::mc "Only private messages and replies to your comments is personal message."] \
-                -group $group \
-                -type boolean
+custom::defvar options(main_jid) "juick@juick.com/Juick" \
+        [::msgcat::mc "Main Juick JID. This used for forwarding things from other chats."] \
+        -group $group \
+        -type string
+custom::defvar options(special_update_juick_tab) 1 \
+        [::msgcat::mc "Only private messages and replies to your comments is personal message."] \
+        -group $group \
+        -type boolean
 
 proc load {} {
     ::richtext::entity_state juick_numbers 1
