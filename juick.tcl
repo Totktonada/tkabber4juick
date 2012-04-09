@@ -8,6 +8,14 @@ option add *juick.private_foreground    blue           widgetDefault
 option add *juick.private_background    #FF9A15        widgetDefault
 option add *juick.citing                gray35         widgetDefault
 
+if {[string equal $::tkabber_version "0.11.1"]} {
+    set scriptdir [file dirname [info script]]
+
+    catch {source [file join $scriptdir \
+        tkabber-0.11.1-compatibility.tcl]} \
+        source_compatibility_file_result
+}
+
 namespace eval juick {
 variable options
 variable juick_nicknames
