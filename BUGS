@@ -2,4 +2,5 @@
 # Mathed: "-". Fixed: "+".
 
 - Citate with smile in middle.
-- Random order of sending cached messages and PM.
+- Iq with your nick received after offline messages => personal messages indicated as common.
+- On opening chat plugin send several iq-requests to Juick JID.
