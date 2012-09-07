@@ -378,7 +378,6 @@ proc insert_from_window {chatid w x y} {
     set ci [chat::input_win $chatid]
     set jid [::xmpp::jid::removeResource [chat::get_jid $chatid]]
 
-
     set tags [$cw tag names "@$x,$y"]
 
     if {[set idx [lsearch -glob $tags JUICK-*]] >= 0} {
@@ -437,11 +436,17 @@ proc add_juick_things_menu {m chatwin X Y x y} {
 }
 
 proc subscribe_to {w thing} {
+    variable options
     set cw [join [lrange [split $w .] 0 end-1] .]
     set chatid [chat::winid_to_chatid $cw]
     set xlib [chat::get_xlib $chatid]
     set jid [chat::get_jid $chatid]
     set body "S $thing"
+
+    if {![is_juick_jid $jid]} {
+        set mainchat [chat::chatid $xlib $options(main_jid)]
+        set jid [chat::get_jid $mainchat]
+    }
 
     message::send_msg $xlib $jid -type chat -body $body
 }
