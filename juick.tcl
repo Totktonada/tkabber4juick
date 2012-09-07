@@ -425,8 +425,13 @@ proc add_juick_things_menu {m chatwin X Y x y} {
     if {[regexp {#\d+$} $thing]} {
         $m add command -label [::msgcat::mc \
             "\[J\] Subscribe to $thing replies."] \
-            -command [list [namespace current]::subscribe_to \
-            $chatwin $thing]
+            -command [list [namespace current]::send_to_juick \
+            $chatwin "S $thing"]
+
+        $m add command -label [::msgcat::mc \
+            "\[J\] Unsubscribe from $thing replies."] \
+            -command [list [namespace current]::send_to_juick \
+            $chatwin "U $thing"]
 
         $m add command -label [::msgcat::mc \
             "\[J\] Open thread in new tab."] \
@@ -435,13 +440,12 @@ proc add_juick_things_menu {m chatwin X Y x y} {
     }
 }
 
-proc subscribe_to {w thing} {
+proc send_to_juick {w body} {
     variable options
     set cw [join [lrange [split $w .] 0 end-1] .]
     set chatid [chat::winid_to_chatid $cw]
     set xlib [chat::get_xlib $chatid]
     set jid [chat::get_jid $chatid]
-    set body "S $thing"
 
     if {![is_juick_jid $jid]} {
         set mainchat [chat::chatid $xlib $options(main_jid)]
