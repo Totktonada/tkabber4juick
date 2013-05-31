@@ -359,7 +359,7 @@ proc rewrite_send_juick_message {chatid user body type} {
         return
     }
 
-    if {[regexp {^S (#\d+)\+\s*$} $body -> thing]} {
+    if {[regexp {^[Ss] (#\d+)\+\s*$} $body -> thing]} {
         set xlib [chat::get_xlib $chatid]
         set jid [chat::get_jid $chatid]
 
