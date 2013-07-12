@@ -272,8 +272,8 @@ proc update_juick_tab {chatid from type body x} {
 }
 
 proc ignore_server_messages {chatid from type body x} {
-    if {[is_juick $chatid] && $from == ""} {
-        return stop;
+    if {[is_juick $chatid] && $from eq ""} {
+        return stop
     }
 }
 
@@ -298,7 +298,7 @@ proc add_number_of_messages_from_juick_to_title {chatid from type body x} {
     }
 
     if {[::ifacetk::chat_window_is_active $chatid]} return
-    if {$from == ""} return
+    if {$from eq ""} return
 
     variable ::ifacetk::number_msg
     variable ::ifacetk::personal_msg
@@ -384,7 +384,7 @@ proc insert_from_window {chatid w x y} {
         set thing [string range [lindex $tags $idx] 6 end]
     }
 
-    if {$thing == ""} return
+    if {$thing eq ""} return
 
     if {![is_juick_jid $jid]} {
         set xlib [chat::get_xlib $chatid]
@@ -412,7 +412,7 @@ proc add_juick_things_menu {m chatwin X Y x y} {
         set thing [string range [lindex $tags $idx] 6 end]
     }
 
-    if {$thing == ""} return
+    if {$thing eq ""} return
 
     $m add command -label [::msgcat::mc \
         "\[J\] Copy thing to clipboard."] \
