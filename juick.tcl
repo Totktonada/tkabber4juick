@@ -140,15 +140,15 @@ proc unload {} {
 proc is_juick_jid {jid} {
     set jid [::xmpp::jid::removeResource $jid]
     set node [::xmpp::jid::node $jid]
-    return [expr [string equal $jid "juick@juick.com"] || \
-        [string equal $node "juick%juick.com"]]
+    return [expr {[string equal $jid "juick@juick.com"] || \
+        [string equal $node "juick%juick.com"]}]
 
 #    if {$without_resource} { \
-#        return [expr [string equal $jid "juick@juick.com"] \
-#           || [regexp "juick%juick.com@.+" $jid]] \
+#        return [expr {[string equal $jid "juick@juick.com"] \
+#           || [regexp "juick%juick.com@.+" $jid]}] \
 #    } else { \
-#       return [expr [string equal $jid "juick@juick.com/Juick"] \
-#           || [regexp "juick%juick.com@.+/Juick" $jid]] \
+#       return [expr {[string equal $jid "juick@juick.com/Juick"] \
+#           || [regexp "juick%juick.com@.+/Juick" $jid]}] \
 #    }
 }
 
@@ -240,13 +240,13 @@ proc is_personal_juick_message {from body} {
             [get_juick_nickname $from] $reply_to_nick]
     }
 
-    return [expr $private_msg || $reply_to_my_comment]
+    return [expr {$private_msg || $reply_to_my_comment}]
 }
 
 proc update_juick_tab {chatid from type body x} {
     variable options
-    if {![expr [is_juick_jid $from] && [string equal $type "chat"] \
-        && $options(special_update_juick_tab)]} \
+    if {!([is_juick_jid $from] && [string equal $type "chat"] \
+        && $options(special_update_juick_tab))} \
     {
         ::plugins::update_tab::update $chatid $from $type $body $x
         return
@@ -279,8 +279,8 @@ proc ignore_server_messages {chatid from type body x} {
 
 proc add_number_of_messages_from_juick_to_title {chatid from type body x} {
     variable options
-    if {![expr [is_juick_jid $from] && [string equal $type "chat"] \
-        && $options(special_update_juick_tab)]} \
+    if {!([is_juick_jid $from] && [string equal $type "chat"] \
+        && $options(special_update_juick_tab))} \
     {
         ::ifacetk::add_number_of_messages_to_title $chatid $from $type \
             $body $x
@@ -674,20 +674,21 @@ proc process {atLevel accName what} {
             continue
         }
 
-        if {[expr [lsearch -exact $type citing]>=0]} {
-        lappend tags CITING
+        if {[lsearch -exact $type citing] >=0} {
+            lappend tags CITING
         }
 
-        if {[expr [lsearch -exact $type juick_ligth]>=0]} {
-        lappend tags JLIGTH
+        if {[lsearch -exact $type juick_ligth] >= 0} {
+            lappend tags JLIGTH
         }
 
         set index 0; set uStart 0; set uEnd 0
         while {[eval {spot_$what $s $index uStart uEnd}]} {
             if {$uStart - $index > 0} {
                 # Write out text before current thing, if any:
-                lappend out [string range $s $index \
-                    [expr {$uStart - 1}]] $type $tags
+                lappend out \
+                    [string range $s $index [expr {$uStart - 1}]] \
+                    $type $tags
             }
 
             set thing [string range $s $uStart $uEnd]
@@ -697,21 +698,21 @@ proc process {atLevel accName what} {
         }
         # Write out text after the last thing, if any:
         if {[string length $s] - $index > 0} {
-        lappend out [string range $s $index end] $type $tags
+            lappend out [string range $s $index end] $type $tags
         }
     }
     set chunks $out
 }
 
 proc render_juick {w type thing tags args} {
-    if {[expr [lsearch -exact $tags CITING] < 0] && \
-        [expr [lsearch -exact $tags JLIGTH] < 0]} \
+    if {[lsearch -exact $tags CITING] < 0 && \
+        [lsearch -exact $tags JLIGTH] < 0} \
     {
-        if {[string equal [string index $thing 0] "#" ]} {
+        if {[string equal [string index $thing 0] "#"]} {
             set type JNUM
-        } elseif {[string equal [string index $thing 0] "*" ]} {
+        } elseif {[string equal [string index $thing 0] "*"]} {
             set type JTAG
-        } elseif {[string equal [string index $thing 0] "@" ]} {
+        } elseif {[string equal [string index $thing 0] "@"]} {
             set type JNICK
         }
     } else {

@@ -9,7 +9,7 @@ rename ::hook::add ::hook::add_orig
 proc ::hook::add {hook func {seq 50}} {
     if {[string equal $hook roster_push_hook] && \
         [string equal $func "::plugins::juick::request_juick_nick"] && \
-        [expr $seq == 99]} \
+        $seq == 99} \
     {
         ::hook::add_orig roster_item_hook $func $seq
     } else {
@@ -197,7 +197,7 @@ rename ::message::send_msg ::message::send_msg_tkabber_0_11_1
 proc ::message::send_msg {xlib args} {
     set invoke [list ::message::send_msg_tkabber_0_11_1]
 
-    if {[expr [llength $args] % 2] == 0} {
+    if {[llength $args] % 2 == 0} {
         # tkabber-0.11.1 invoke
         set jid $xlib
         lappend invoke $jid
