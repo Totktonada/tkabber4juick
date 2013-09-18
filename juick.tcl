@@ -47,7 +47,12 @@ custom::defvar options(main_jid) "juick@juick.com/Juick" \
         -type string
 custom::defvar options(special_update_juick_tab) 1 \
         [::msgcat::mc \
-            "Only private messages and replies to your comments is personal message."] \
+            "Indicate as personal message only private messages and replies to you."] \
+        -group $group \
+        -type boolean
+custom::defvar options(special_update_juick_tab_replies_to_posts) 1 \
+        [::msgcat::mc \
+            "Whether replies to your posts is \"replies to you\"."] \
         -group $group \
         -type boolean
 
@@ -186,14 +191,19 @@ proc is_reply_to_you {x} {
 }
 
 proc is_personal_juick_message {from body x} {
+    variable options
+
     set private_msg [regexp {^Private message from @.+:\n} $body]
 
     set reply_to_comment [regexp \
         {Reply by @[^\n ]+:\n>.+\n\n@([^\n ]+) .+\n\n#\d+/\d+ http://juick.com/\d+#\d+$} \
         $body -> reply_to_nick]
 
-    set reply_to_my_comment [expr {$reply_to_comment && [is_reply_to_you $x]}]
-    return [expr {$private_msg || $reply_to_my_comment}]
+    set reply_to_me [is_reply_to_you $x]
+    set matchall $options(special_update_juick_tab_replies_to_posts)
+
+    return [expr { $private_msg || \
+        ($reply_to_me && ($matchall || $reply_to_comment))}]
 }
 
 proc update_juick_tab {chatid from type body x} {
