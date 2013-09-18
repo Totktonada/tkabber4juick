@@ -195,8 +195,6 @@ proc receive_juick_nick {jid res child} {
 }
 
 proc handle_message {chatid from type body x} {
-    variable juick_nicknames
-
     if {![is_juick $chatid]} return
 
     ::richtext::property_add {JUICK} {}
@@ -227,7 +225,6 @@ proc get_juick_nickname {jid} {
 }
 
 proc is_personal_juick_message {from body} {
-    variable juick_nicknames
     set reply_to_my_comment 0
 
     set private_msg [regexp {^Private message from @.+:\n} $body]
