@@ -18,7 +18,6 @@ if {[string equal $::tkabber_version "0.11.1"]} {
 
 namespace eval juick {
 variable options
-variable juick_nicknames
 variable chat_things
 
 ::msgcat::mcload [file join [file dirname [info script]] msgs]
@@ -87,9 +86,6 @@ proc load {} {
     hook::remove draw_message_hook \
         ::::ifacetk::add_number_of_messages_to_title 18
 
-    hook::add roster_push_hook \
-        [namespace current]::request_juick_nick 99
-
     hook::add generate_completions_hook \
         [namespace current]::juick_commands_comps 99
 }
@@ -125,9 +121,6 @@ proc unload {} {
     hook::add draw_message_hook \
         ::::ifacetk::add_number_of_messages_to_title 18
 
-    hook::remove roster_push_hook \
-        [namespace current]::request_juick_nick 99
-
     hook::remove generate_completions_hook \
         [namespace current]::juick_commands_comps 99
 
@@ -158,42 +151,6 @@ proc is_juick {chatid} {
     return [is_juick_jid $jid]
 }
 
-proc request_juick_nick {xlib jid name groups subsc ask} {
-    variable juick_nicknames
-
-    if {![is_juick_jid $jid] || [info exists juick_nicknames($jid)]} {
-        return
-    }
-
-    ::xmpp::sendIQ $xlib get \
-        -query [::xmpp::xml::create query \
-            -xmlns "http://juick.com/query#users"] \
-        -to $jid \
-        -command [list [namespace current]::receive_juick_nick $jid]
-}
-
-proc receive_juick_nick {jid res child} {
-    variable juick_nicknames
-
-    if {![string equal $res ok]} return
-
-    ::xmpp::xml::split $child tag xmlns attrs cdata subels
-
-    if {![string equal $xmlns "http://juick.com/query#users"]} return
-
-    set ch [lindex $subels 0]
-    ::xmpp::xml::split $ch stag sxmlns sattrs scdata ssubels
-
-    if {![string equal $sxmlns "http://juick.com/user"]} return
-
-    set uname [::xmpp::xml::getAttr $sattrs uname]
-    set juick_nicknames($jid) $uname
-
-#    puts "For $jid: uname is \"$uname\""
-
-    return
-}
-
 proc handle_message {chatid from type body x} {
     if {![is_juick $chatid]} return
 
@@ -211,32 +168,31 @@ proc handle_message {chatid from type body x} {
     return stop
 }
 
-proc get_juick_nickname {jid} {
-    variable juick_nicknames
+proc is_reply_to_you {x} {
+    foreach xe $x {
+        ::xmpp::xml::split $xe tag xmlns attrs cdata subels
 
-    set uname ""
-    set jid [::xmpp::jid::removeResource $jid]
-
-    if {[info exists juick_nicknames($jid)]} {
-        set uname $juick_nicknames($jid)
+        if {[string equal $tag "juick"] && \
+            [string equal $xmlns "http://juick.com/message"]} \
+        {
+            set replytoyou [::xmpp::xml::getAttr $attrs replytoyou false]
+            if {[string equal $replytoyou true]} {
+                return 1
+            }
+        }
     }
 
-    return $uname
+    return 0
 }
 
-proc is_personal_juick_message {from body} {
-    set reply_to_my_comment 0
-
+proc is_personal_juick_message {from body x} {
     set private_msg [regexp {^Private message from @.+:\n} $body]
+
     set reply_to_comment [regexp \
         {Reply by @[^\n ]+:\n>.+\n\n@([^\n ]+) .+\n\n#\d+/\d+ http://juick.com/\d+#\d+$} \
         $body -> reply_to_nick]
 
-    if {$reply_to_comment} {
-        set reply_to_my_comment [string equal \
-            [get_juick_nickname $from] $reply_to_nick]
-    }
-
+    set reply_to_my_comment [expr {$reply_to_comment && [is_reply_to_you $x]}]
     return [expr {$private_msg || $reply_to_my_comment}]
 }
 
@@ -261,7 +217,7 @@ proc update_juick_tab {chatid from type body x} {
 
     set cw [chat::winid $chatid]
 
-    if {[is_personal_juick_message $from $body]} {
+    if {[is_personal_juick_message $from $body $x]} {
         tab_set_updated $cw 1 mesg_to_user
     } else {
         tab_set_updated $cw 1 message
@@ -302,7 +258,7 @@ proc add_number_of_messages_from_juick_to_title {chatid from type body x} {
 
     incr number_msg($chatid)
 
-    if {[is_personal_juick_message $from $body]} {
+    if {[is_personal_juick_message $from $body $x]} {
         incr personal_msg($chatid)
     }
 

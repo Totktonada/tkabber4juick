@@ -183,8 +183,16 @@ proc ::xmpp::sendIQAnswer {cmd res child} {
     uplevel #0 $cmd [list $res $child]
 }
 
-proc ::xmpp::xml::getAttr {attrList attrName} {
-    ::jlib::wrapper:getattr $attrList $attrName
+proc ::xmpp::xml::getAttr {attrList attrName {fallback ""}} {
+    set res $fallback
+
+    foreach {attr val} $attrList {
+        if {[string equal $attr $attrName]} {
+            set res $val
+        }
+    }
+
+    return $res
 }
 
 proc ::chat::activate {chatid} {
