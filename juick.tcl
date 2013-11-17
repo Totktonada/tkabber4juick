@@ -232,7 +232,6 @@ proc get_juick_nick {xlib jid name groups subsc ask} {
         return
     }
 
-    puts "$jid $uname"
     set juick_nicknames($jid) $uname
 }
 
@@ -535,7 +534,7 @@ proc receive_juick_thread {jid res child0} {
         }
     }
 
-    puts "Get message from $jid: \"$msg\""
+    #puts "Get message from $jid: \"$msg\""
 
     # open new tab
 
