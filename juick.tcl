@@ -1,4 +1,5 @@
 package require msgcat
+package require http
 
 option add *juick.nick                  red            widgetDefault
 option add *juick.tag                   ForestGreen    widgetDefault
@@ -18,6 +19,7 @@ if {[string equal $::tkabber_version "0.11.1"]} {
 
 namespace eval juick {
 variable options
+variable juick_nicknames
 variable chat_things
 
 ::msgcat::mcload [file join [file dirname [info script]] msgs]
@@ -37,24 +39,20 @@ custom::defgroup Plugins [::msgcat::mc "Plugins options."] -group Tkabber
 
 set group "Juick"
 custom::defgroup $group \
-        [::msgcat::mc "Juick settings."] \
-        -group Plugins
+    [::msgcat::mc "Juick settings."] \
+    -group Plugins
 
 custom::defvar options(main_jid) "juick@juick.com/Juick" \
-        [::msgcat::mc \
-            "Main Juick JID. This used for forwarding things from other chats."] \
-        -group $group \
-        -type string
+    [::msgcat::mc \
+        "Main Juick JID. This used for forwarding things from other chats."] \
+    -group $group \
+    -type string
 custom::defvar options(special_update_juick_tab) 1 \
-        [::msgcat::mc \
-            "Indicate as personal message only private messages and replies to you."] \
-        -group $group \
-        -type boolean
-custom::defvar options(special_update_juick_tab_replies_to_posts) 1 \
-        [::msgcat::mc \
-            "Whether replies to your posts is \"replies to you\"."] \
-        -group $group \
-        -type boolean
+    [format "%s\n%s" \
+        [::msgcat::mc "Indicate as personal message only private messages and replies to you."] \
+        [::msgcat::mc "Your Juick nickname determines at roster receiving, so after enable option you need to reconnecting."]] \
+    -group $group \
+    -type boolean
 
 proc load {} {
     ::richtext::entity_state juick_numbers 1
@@ -91,6 +89,9 @@ proc load {} {
     hook::remove draw_message_hook \
         ::::ifacetk::add_number_of_messages_to_title 18
 
+    hook::add roster_push_hook \
+        [namespace current]::get_juick_nick 99
+
     hook::add generate_completions_hook \
         [namespace current]::juick_commands_comps 99
 }
@@ -126,6 +127,9 @@ proc unload {} {
     hook::add draw_message_hook \
         ::::ifacetk::add_number_of_messages_to_title 18
 
+    hook::remove roster_push_hook \
+        [namespace current]::get_juick_nick 99
+
     hook::remove generate_completions_hook \
         [namespace current]::juick_commands_comps 99
 
@@ -156,6 +160,82 @@ proc is_juick {chatid} {
     return [is_juick_jid $jid]
 }
 
+proc get_juick_nick {xlib jid name groups subsc ask} {
+    variable options
+    variable juick_nicknames
+
+    if {![info exists options(special_update_juick_tab)] \
+        || ! $options(special_update_juick_tab)} \
+    {
+        return
+    }
+
+    if {![is_juick_jid $jid] || [info exists juick_nicknames($jid)]} {
+        return
+    }
+
+    # For Juick contacts connected via j2j transport is difficult
+    # to determine user jid.
+    if {[string first % $jid] >= 0} {
+        return
+    }
+
+    set my_jid [connection_jid $xlib]
+    set my_jid [::xmpp::jid::removeResource $my_jid]
+    set nick_request_url "http://api.juick.com/users?jid=$my_jid"
+
+    if {[catch {::http::geturl $nick_request_url} token]} {
+        return
+    }
+
+    # Data format (json):
+    # [{"uid":XXXX,"uname":"XXXX","jid":"XXXX@XXXX"}]
+    set data [::http::data $token]
+    ::http::cleanup $token
+
+    # If has no json package, try to parse by regexp.
+    if {[catch {package require json}]} {
+        if {![regexp {\[{.*"uname"\w*:\w*"([^"]+)".*}\]} $data -> uname]} {
+            # For vim syntax highlighter: "
+            return
+        }
+
+        set juick_nicknames($jid) $uname
+        return
+    }
+
+    set ds [::json::json2dict $data]
+
+    if {[llength $ds] != 1} {
+        return
+    }
+
+    set d [lindex $ds 0]
+
+    # If dict command not available...
+    if {[catch {dict create}]} {
+        # Try to load dict package...
+        if {[catch {package require dict}]} {
+            # If it fails, get uname value without dict command.
+            foreach {key value} $d {
+                switch -- $key {
+                    uname { set uname $value }
+                }
+            }
+
+            set juick_nicknames($jid) $uname
+            return
+        }
+    }
+
+    if {[catch {dict get $d uname} uname]} {
+        return
+    }
+
+    puts "$jid $uname"
+    set juick_nicknames($jid) $uname
+}
+
 proc handle_message {chatid from type body x} {
     if {![is_juick $chatid]} return
 
@@ -173,24 +253,20 @@ proc handle_message {chatid from type body x} {
     return stop
 }
 
-proc is_reply_to_you {x} {
-    foreach xe $x {
-        ::xmpp::xml::split $xe tag xmlns attrs cdata subels
+proc get_my_juick_nickname {jid} {
+    variable juick_nicknames
 
-        if {[string equal $tag "juick"] && \
-            [string equal $xmlns "http://juick.com/message"]} \
-        {
-            set replytoyou [::xmpp::xml::getAttr $attrs replytoyou false]
-            if {[string equal $replytoyou true]} {
-                return 1
-            }
-        }
+    set uname ""
+    set jid [::xmpp::jid::removeResource $jid]
+
+    if {[info exists juick_nicknames($jid)]} {
+        set uname $juick_nicknames($jid)
     }
 
-    return 0
+    return $uname
 }
 
-proc is_personal_juick_message {from body x} {
+proc is_personal_juick_message {from body} {
     variable options
 
     set private_msg [regexp {^Private message from @.+:\n} $body]
@@ -199,11 +275,14 @@ proc is_personal_juick_message {from body x} {
         {Reply by @[^\n ]+:\n>.+\n\n@([^\n ]+) .+\n\n#\d+/\d+ http://juick.com/\d+#\d+$} \
         $body -> reply_to_nick]
 
-    set reply_to_me [is_reply_to_you $x]
-    set matchall $options(special_update_juick_tab_replies_to_posts)
+    if {$reply_to_comment} {
+        set reply_to_me [string equal \
+            [get_my_juick_nickname $from] $reply_to_nick]
+    } else {
+        set reply_to_me 0
+    }
 
-    return [expr { $private_msg || \
-        ($reply_to_me && ($matchall || $reply_to_comment))}]
+    return [expr {$private_msg || $reply_to_me}]
 }
 
 proc update_juick_tab {chatid from type body x} {
@@ -227,7 +306,7 @@ proc update_juick_tab {chatid from type body x} {
 
     set cw [chat::winid $chatid]
 
-    if {[is_personal_juick_message $from $body $x]} {
+    if {[is_personal_juick_message $from $body]} {
         tab_set_updated $cw 1 mesg_to_user
     } else {
         tab_set_updated $cw 1 message
@@ -268,7 +347,7 @@ proc add_number_of_messages_from_juick_to_title {chatid from type body x} {
 
     incr number_msg($chatid)
 
-    if {[is_personal_juick_message $from $body $x]} {
+    if {[is_personal_juick_message $from $body]} {
         incr personal_msg($chatid)
     }
 
@@ -459,7 +538,6 @@ proc receive_juick_thread {jid res child0} {
     puts "Get message from $jid: \"$msg\""
 
     # open new tab
-    
 
     return
 }
@@ -488,7 +566,7 @@ proc browse_thing {w thing} {
 #variable commands {HELP NICK LOGIN "S " "U " ON OFF "D " "BL " "WL " "PM " VCARD PING INVITE}
 variable commands {HELP NICK LOGIN S U ON OFF D BL WL PM CARD PING INVITE}
 proc correct_command {chatid user body type} {
-   # Maybe once I'll get arount to it 
+   # Maybe once I'll get arount to it
 }
 
 proc juick_commands_comps {chatid compsvar wordstart line} {
