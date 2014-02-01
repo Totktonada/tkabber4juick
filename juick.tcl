@@ -455,29 +455,32 @@ proc add_juick_things_menu {m chatwin X Y x y} {
 
     if {$thing eq ""} return
 
-    $m add command -label [::msgcat::mc \
-        "\[J\] Copy thing to clipboard."] \
+    $m add command -label [format [::msgcat::mc \
+        "\[J\] Copy %s to clipboard"] $thing] \
         -command [list [namespace current]::copy_thing $chatwin $thing]
 
-    $m add command -label [format [::msgcat::mc \
-        "\[J\] Open %s in browser."] $thing]\
+    $m add command -label [::msgcat::mc \
+        "\[J\] Open in browser"]\
         -command [list [namespace current]::browse_thing $chatwin $thing]
 
     if {[regexp {#\d+$} $thing]} {
+# Currently not implemented.
+if {0} {
         $m add command -label [::msgcat::mc \
-            "\[J\] Subscribe to $thing replies."] \
+            "\[J\] Open in new tab"] \
+            -command [list [namespace current]::get_juick_thread \
+            $chatwin $thing]
+}
+
+        $m add command -label [::msgcat::mc \
+            "\[J\] Subscribe"] \
             -command [list [namespace current]::send_to_juick \
             $chatwin "S $thing"]
 
         $m add command -label [::msgcat::mc \
-            "\[J\] Unsubscribe from $thing replies."] \
+            "\[J\] Unsubscribe"] \
             -command [list [namespace current]::send_to_juick \
             $chatwin "U $thing"]
-
-        $m add command -label [::msgcat::mc \
-            "\[J\] Open thread in new tab."] \
-            -command [list [namespace current]::get_juick_thread \
-            $chatwin $thing]
     }
 }
 
