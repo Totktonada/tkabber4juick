@@ -556,7 +556,7 @@ proc browse_thing {w thing} {
           browseurl http://juick.com/[string range $thing 1 end]
           }
         {^\*} {
-          browseurl http://juick.com/last?tag=[string range $thing 1 end]
+          browseurl http://juick.com/tag/[string range $thing 1 end]
           }
     }
 }
