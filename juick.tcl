@@ -459,8 +459,8 @@ proc add_juick_things_menu {m chatwin X Y x y} {
         "\[J\] Copy thing to clipboard."] \
         -command [list [namespace current]::copy_thing $chatwin $thing]
 
-    $m add command -label [::msgcat::mc \
-        "\[J\] Open thing in browser."] \
+    $m add command -label [format [::msgcat::mc \
+        "\[J\] Open %s in browser."] $thing]\
         -command [list [namespace current]::browse_thing $chatwin $thing]
 
     if {[regexp {#\d+$} $thing]} {
