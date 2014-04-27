@@ -18,6 +18,7 @@ if {[string equal $::tkabber_version "0.11.1"]} {
 }
 
 namespace eval juick {
+
 variable options
 variable juick_nicknames
 variable chat_things
@@ -59,6 +60,35 @@ proc load {} {
     ::richtext::entity_state citing 1
     ::richtext::entity_state juick 1
     ::richtext::entity_state juick_ligth 1
+    ::richtext::entity_state markdown_url 1
+
+    ::richtext::register_entity juick_numbers \
+        -configurator [namespace current]::configure_juick_numbers \
+        -parser [namespace current]::process_juick_numbers \
+        -renderer [namespace current]::render_juick \
+        -parser-priority 54
+
+    ::richtext::register_entity juick_ligth \
+        -configurator [namespace current]::configure_juick_ligth \
+        -parser [namespace current]::process_juick_ligth \
+        -renderer [namespace current]::render_juick_ligth \
+        -parser-priority 81
+
+    ::richtext::register_entity citing \
+        -configurator [namespace current]::configure_citing \
+        -parser [namespace current]::process_citing \
+        -renderer [namespace current]::render_citing \
+        -parser-priority 82
+
+    ::richtext::register_entity juick \
+        -configurator [namespace current]::configure_juick \
+        -parser [namespace current]::process_juick \
+        -renderer [namespace current]::render_juick \
+        -parser-priority 85
+
+    ::richtext::register_entity markdown_url \
+	    -parser [namespace current]::process_markdown_urls \
+	    -parser-priority 49
 
     hook::add draw_message_hook        \
         [namespace current]::ignore_server_messages 0
@@ -97,6 +127,12 @@ proc load {} {
 }
 
 proc unload {} {
+    ::richtext::unregister_entity juick_numbers
+    ::richtext::unregister_entity citing
+    ::richtext::unregister_entity juick
+    ::richtext::unregister_entity juick_ligth
+    ::richtext::unregister_entity process_markdown_urls
+
     hook::remove draw_message_hook        \
         [namespace current]::ignore_server_messages 0
 
@@ -683,6 +719,32 @@ proc spot_juick_numbers {what at startVar endVar} {
     return true
 }
 
+proc spot_markdown_url {what at startVar endVar} {
+    variable ::plugins::urls::url_regexp
+
+    set matched [regexp -indices -start $at -- \
+        {(\[([^\]]+)\]\[([^\]]+)\])} $what -> \
+        bounds title_bounds url_bounds]
+
+    if {!$matched} { return false }
+
+    lassign $url_bounds us ue
+    set url [string range $what $us $ue]
+    set md_url_regexp [format "^%s$" $::plugins::urls::url_regexp]
+    set matched [regexp -expanded -nocase -- $md_url_regexp $url]
+
+    if {!$matched} { return false }
+
+    upvar 1 $startVar uStart $endVar uEnd
+    lassign $bounds uStart uEnd
+    upvar 1 title_start title_start title_end title_end
+    lassign $title_bounds title_start title_end
+    upvar 1 url_start url_start url_end url_end
+    lassign $url_bounds url_start url_end
+
+    return true
+}
+
 proc process_juick {atLevel accName} {
     if {[::richtext::property_exists {JUICK}]} {
         return [process $atLevel $accName juick]
@@ -702,6 +764,12 @@ proc process_citing {atLevel accName} {
 proc process_juick_ligth {atLevel accName} {
     if {[::richtext::property_exists {JUICK}]} {
        return [process $atLevel $accName juick_ligth]
+    }
+}
+
+proc process_markdown_urls {atLevel accName} {
+    if {[::richtext::property_exists {JUICK}]} {
+       return [process $atLevel $accName markdown_url]
     }
 }
 
@@ -735,8 +803,17 @@ proc process {atLevel accName what} {
             }
 
             set thing [string range $s $uStart $uEnd]
-            # Write out current thing:
-            lappend out $thing $what $tags
+
+            if {[string equal $what markdown_url]} {
+                set title [string range $s $title_start $title_end]
+                set url [string range $s $url_start $url_end]
+                lappend out $url url $tags
+                ::richtext::property_update url:title,$url $title
+            } else {
+                # Write out current thing:
+                lappend out $thing $what $tags
+            }
+
             set index [expr {$uEnd + 1}]
         }
         # Write out text after the last thing, if any:
@@ -796,28 +873,6 @@ proc render_juick_ligth {w type thing tags args} {
     return $id
 }
 
-::richtext::register_entity juick_numbers \
-    -configurator [namespace current]::configure_juick_numbers \
-    -parser [namespace current]::process_juick_numbers \
-    -renderer [namespace current]::render_juick \
-    -parser-priority 54
-
-::richtext::register_entity juick_ligth \
-    -configurator [namespace current]::configure_juick_ligth \
-    -parser [namespace current]::process_juick_ligth \
-    -renderer [namespace current]::render_juick_ligth \
-    -parser-priority 81
-
-::richtext::register_entity citing \
-    -configurator [namespace current]::configure_citing \
-    -parser [namespace current]::process_citing \
-    -renderer [namespace current]::render_citing \
-    -parser-priority 82
-
-::richtext::register_entity juick \
-    -configurator [namespace current]::configure_juick \
-    -parser [namespace current]::process_juick \
-    -renderer [namespace current]::render_juick \
-    -parser-priority 85
+# namespace eval juick
 }
 # vi:ts=4:et
