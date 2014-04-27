@@ -1,6 +1,5 @@
 # You can report about all bugs this plugin via jabber: totktonada@totktonada.ru.
-# Mathed: "-". Fixed: "+".
+# Matched: "-". Fixed: "+".
 
 - Citate with smile in middle.
-- Iq with your nick received after offline messages => personal messages indicated as common.
-- On opening chat plugin send several iq-requests to Juick JID.
+- Replies to your messages currently not indicated as personal.
