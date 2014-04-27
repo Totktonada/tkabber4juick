@@ -722,9 +722,17 @@ proc spot_juick_numbers {what at startVar endVar} {
 proc spot_markdown_url {what at startVar endVar} {
     variable ::plugins::urls::url_regexp
 
+    # [title][URL]
     set matched [regexp -indices -start $at -- \
         {(\[([^\]]+)\]\[([^\]]+)\])} $what -> \
         bounds title_bounds url_bounds]
+
+    if {!$matched} {
+        # [title](URL)
+        set matched [regexp -indices -start $at -- \
+            {(\[([^\]]+)\]\(([^\)]+)\))} $what -> \
+            bounds title_bounds url_bounds]
+    }
 
     if {!$matched} { return false }
 
