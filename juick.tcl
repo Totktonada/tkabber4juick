@@ -1,14 +1,16 @@
 package require msgcat
 package require http
 
+# XRDB options
+option add *juick.number                blue           widgetDefault
+option add *juick.private.fg            blue           widgetDefault
+option add *juick.private.bg            #FF9A15        widgetDefault
+option add *juick.citing                gray35         widgetDefault
 option add *juick.nick                  red            widgetDefault
 option add *juick.tag                   ForestGreen    widgetDefault
-option add *juick.my                    gray           widgetDefault
-option add *juick.number                blue           widgetDefault
-option add *juick.private_foreground    blue           widgetDefault
-option add *juick.private_background    #FF9A15        widgetDefault
-option add *juick.citing                gray35         widgetDefault
+option add *juick.my_msg                gray           widgetDefault
 
+# Compatibility with old Tkabber version
 if {[string equal $::tkabber_version "0.11.1"]} {
     set scriptdir [file dirname [info script]]
 
@@ -55,130 +57,72 @@ custom::defvar options(special_update_juick_tab) 1 \
     -group $group \
     -type boolean
 
+# list of {name only_parser priority}
+variable juick_richtext_processors { 
+    {juick_md_url_square_brackets 1 49}
+    {juick_md_url_round_brackets  1 49}
+    {juick_numbers                0 54}
+    {juick_private_highlight      0 81}
+    {juick_citing                 0 82}
+    {juick_nicks_tags_my          0 85}
+}
+
+# list of {hook proc priority orig_proc}
+variable juick_hooks {
+    {roster_push_hook          get_juick_nick             99 ""}
+    {draw_message_hook         ignore_server_messages      0 ""}
+    {draw_message_hook         handle_message             21 ""}
+    {chat_window_click_hook    insert_from_window         99 ""}
+    {chat_win_popup_menu_hook  add_juick_things_menu      20 ""}
+    {rewrite_message_hook      rewrite_juick_message      20 ""}
+    {chat_send_message_hook    rewrite_send_juick_message 19 ""}
+    {generate_completions_hook juick_commands_comps       99 ""}
+    {draw_message_hook         update_juick_tab            8 \
+        ::plugins::update_tab::update}
+    {draw_message_hook         add_number_to_tab_title    18 \
+        ::::ifacetk::add_number_of_messages_to_title}
+}
+
 proc load {} {
-    ::richtext::entity_state juick_numbers 1
-    ::richtext::entity_state citing 1
-    ::richtext::entity_state juick 1
-    ::richtext::entity_state juick_ligth 1
-    ::richtext::entity_state markdown_url_square_brackets 1
-    ::richtext::entity_state markdown_url_round_brackets 1
+    variable juick_richtext_processors
 
-    ::richtext::register_entity juick_numbers \
-        -configurator [namespace current]::configure_juick_numbers \
-        -parser [namespace current]::process_juick_numbers \
-        -renderer [namespace current]::render_juick \
-        -parser-priority 54
+    foreach {name only_parser priority} $juick_richtext_processors {
+        ::richtext::entity_state $name 1
 
-    ::richtext::register_entity juick_ligth \
-        -configurator [namespace current]::configure_juick_ligth \
-        -parser [namespace current]::process_juick_ligth \
-        -renderer [namespace current]::render_juick_ligth \
-        -parser-priority 81
+        set args {}
+        lappend args -parser [list [namespace current]::process $name]
+        lappend args -parser-priority $priority
 
-    ::richtext::register_entity citing \
-        -configurator [namespace current]::configure_citing \
-        -parser [namespace current]::process_citing \
-        -renderer [namespace current]::render_citing \
-        -parser-priority 82
+        if {!$only_parser} {
+            lappend args -configurator [list [namespace current]::configure $name]
+            lappend args -renderer [list [namespace current]::render $name]
+        }
 
-    ::richtext::register_entity juick \
-        -configurator [namespace current]::configure_juick \
-        -parser [namespace current]::process_juick \
-        -renderer [namespace current]::render_juick \
-        -parser-priority 85
+        ::richtext::register_entity $name $args
+    }
 
-    ::richtext::register_entity markdown_url_square_brackets \
-	    -parser [namespace current]::process_markdown_url_square_brackets \
-	    -parser-priority 49
+    foreach {hook proc priority orig_proc} $juick_hooks {
+        if {![string equal $orig_proc ""]} {
+            hook::remove $orig_hook $priority
+        }
 
-    ::richtext::register_entity markdown_url_round_brackets \
-	    -parser [namespace current]::process_markdown_url_round_brackets \
-	    -parser-priority 49
-
-    hook::add draw_message_hook        \
-        [namespace current]::ignore_server_messages 0
-
-    hook::add draw_message_hook        \
-        [namespace current]::handle_message 21
-
-    hook::add chat_window_click_hook   \
-        [namespace current]::insert_from_window
-
-    hook::add chat_win_popup_menu_hook \
-        [namespace current]::add_juick_things_menu 20
-
-    hook::add rewrite_message_hook     \
-        [namespace current]::rewrite_juick_message 20
-
-    hook::add chat_send_message_hook   \
-        [namespace current]::rewrite_send_juick_message 19
-
-    hook::add draw_message_hook \
-        [namespace current]::update_juick_tab 8
-
-    hook::remove draw_message_hook ::plugins::update_tab::update 8
-
-    hook::add draw_message_hook \
-        [namespace current]::add_number_of_messages_from_juick_to_title 18
-
-    hook::remove draw_message_hook \
-        ::::ifacetk::add_number_of_messages_to_title 18
-
-    hook::add roster_push_hook \
-        [namespace current]::get_juick_nick 99
-
-    hook::add generate_completions_hook \
-        [namespace current]::juick_commands_comps 99
+        hook::add $hook [namespace current]::$proc $priority
+    }
 }
 
 proc unload {} {
-    ::richtext::unregister_entity juick_numbers
-    ::richtext::unregister_entity citing
-    ::richtext::unregister_entity juick
-    ::richtext::unregister_entity juick_ligth
-    ::richtext::unregister_entity process_markdown_url_square_brackets
-    ::richtext::unregister_entity process_markdown_url_round_brackets
+    foreach {name _ _} $juick_richtext_processors {
+        ::richtext::unregister_entity $name
+        ::richtext::enity_state $name 0
+    }
 
-    hook::remove draw_message_hook        \
-        [namespace current]::ignore_server_messages 0
+    foreach {hook proc priority orig_proc} $juick_hooks {
+        hook::remove $hook [namespace current]::$proc $priority
 
-    hook::remove draw_message_hook        \
-        [namespace current]::handle_message 21
-
-    hook::remove chat_window_click_hook   \
-        [namespace current]::insert_from_window
-
-    hook::remove chat_win_popup_menu_hook \
-        [namespace current]::add_juick_things_menu 20
-
-    hook::remove rewrite_message_hook     \
-        [namespace current]::rewrite_juick_message 20
-
-    hook::remove chat_send_message_hook   \
-        [namespace current]::rewrite_send_juick_message 19
-
-    hook::remove draw_message_hook \
-        [namespace current]::update_juick_tab 8
-
-    hook::add draw_message_hook \
-        ::plugins::update_tab::update 8
-
-    hook::remove draw_message_hook \
-        [namespace current]::add_number_of_messages_from_juick_to_title 18
-
-    hook::add draw_message_hook \
-        ::::ifacetk::add_number_of_messages_to_title 18
-
-    hook::remove roster_push_hook \
-        [namespace current]::get_juick_nick 99
-
-    hook::remove generate_completions_hook \
-        [namespace current]::juick_commands_comps 99
-
-    ::richtext::entity_state juick_numbers 0
-    ::richtext::entity_state citing 0
-    ::richtext::entity_state juick 0
-    ::richtext::entity_state juick_ligth 0
+        if {![string equal $orig_proc ""]} {
+            hook::add $orig_hook $priority
+        }
+    }
 }
 
 proc is_juick_jid {jid} {
@@ -287,7 +231,7 @@ proc handle_message {chatid from type body x} {
 
     set tags {}
     if {![string equal $jid $from]} {
-        lappend tags JMY
+        lappend tags JUICK_MY_MSG
     }
 
     ::richtext::render_message $chatw $body $tags
@@ -360,7 +304,8 @@ proc ignore_server_messages {chatid from type body x} {
     }
 }
 
-proc add_number_of_messages_from_juick_to_title {chatid from type body x} {
+# Add number of messages from Juick to the tab title
+proc add_number_to_tab_title {chatid from type body x} {
     variable options
     if {!([is_juick_jid $from] && [string equal $type "chat"] \
         && $options(special_update_juick_tab))} \
@@ -647,82 +592,38 @@ if {0} {
 # --------------
 # RichText stuff
 
-proc configure_juick {w} {
-    set options(juick.nick) [option get $w juick.nick Text]
-    set options(juick.tag) [option get $w juick.tag Text]
-    set options(juick.my) [option get $w juick.my Text]
+proc configure {what w} {
+    switch -exact $what {
+        juick_numbers {
+            set options(juick.number) [option get $w juick.number Text]
+            $w tag configure JUICK_NUMBER -foreground $options(juick.number)
+        }
+        juick_private_highlight {
+            set options(juick.private.fg) \
+                [option get $w juick.private.fg Text]
+            $w tag configure JUICK_PRIVATE_HIGHLIGHT -foreground \
+                $options(juick.private.fg)
 
-    $w tag configure JNICK -foreground $options(juick.nick)
-    $w tag configure JTAG -foreground $options(juick.tag)
-    $w tag configure JMY -foreground $options(juick.my)
-}
+            set options(juick.private.bg) \
+                [option get $w juick.private.bg Text]
+            $w tag configure JUICK_PRIVATE_HIGHLIGHT -background \
+                $options(juick.private.bg)
+        }
+        juick_citing {
+            set options(juick.citing) [option get $w juick.citing Text]
+            $w tag configure JUICK_CITING -foreground $options(juick.citing)
+        }
+        juick_nicks_tags_my {
+            set options(juick.nick) [option get $w juick.nick Text]
+            $w tag configure JUICK_NICK -foreground $options(juick.nick)
 
-proc configure_juick_numbers {w} {
-    set options(juick.number) [option get $w juick.number Text]
+            set options(juick.tag) [option get $w juick.tag Text]
+            $w tag configure JUICK_TAG -foreground $options(juick.tag)
 
-    $w tag configure JNUM -foreground $options(juick.number)
-}
-
-proc configure_juick_ligth {w} {
-    set options(juick.private_foreground) \
-        [option get $w juick.private_foreground Text]
-
-    set options(juick.private_background) \
-        [option get $w juick.private_background Text]
-
-    $w tag configure JLIGTH -foreground $options(juick.private_foreground)
-    $w tag configure JLIGTH -background $options(juick.private_background)
-}
-
-proc configure_citing {w} {
-    set options(juick.citing) [option get $w juick.citing Text]
-
-    $w tag configure CITING -foreground $options(juick.citing)
-}
-
-proc spot_juick_ligth {what at startVar endVar} {
-    set matched [regexp -indices -start $at -- \
-        {(^Private message)(?: from @.+:\n)} $what -> bounds]
-
-    if {!$matched} { return false }
-
-    upvar 1 $startVar uStart $endVar uEnd
-    lassign $bounds uStart uEnd
-    return true
-}
-
-proc spot_citing {what at startVar endVar} {
-    set matched [regexp -indices -start $at -- \
-        {(?:\n|\A)(>[^\n]+)} $what -> bounds]
-
-    if {!$matched} { return false }
-
-    upvar 1 $startVar uStart $endVar uEnd
-    lassign $bounds uStart uEnd
-    return true
-}
-
-proc spot_juick {what at startVar endVar} {
-    set matched [regexp -indices -start $at -- \
-        {(?:\s|\n|\A|\(|\>)(@[\w@.-]+|\*[\w?!+'/.-]+)(?:(\.(\s|\n))?)} \
-        $what -> bounds]
-
-    if {!$matched} { return false }
-
-    upvar 1 $startVar uStart $endVar uEnd
-    lassign $bounds uStart uEnd
-    return true
-}
-
-proc spot_juick_numbers {what at startVar endVar} {
-    set matched [regexp -indices -start $at -- \
-        {(?:\s|\n|\A|\(|\>)(#\d+(/\d+)?)(?:(\.(\s|\n))?)} $what -> bounds]
-
-    if {!$matched} { return false }
-
-    upvar 1 $startVar uStart $endVar uEnd
-    lassign $bounds uStart uEnd
-    return true
+            set options(juick.my_msg) [option get $w juick.my_msg Text]
+            $w tag configure JUICK_MY_MSG -foreground $options(juick.my_msg)
+        }
+    }
 }
 
 proc spot_markdown_url {type what at startVar endVar} {
@@ -766,63 +667,49 @@ proc spot {type what at startVar endVar} {
     upvar 1 $startVar uStart $endVar uEnd
 
     switch -glob $type {
-        markdown_url* { spot_markdown_url $type $what $at uStart uEnd}
-        default       { spot_$type $what $at uStart uEnd}
+        markdown_url* {
+            return [spot_markdown_url $type $what $at uStart uEnd]
+        }
+        spot_juick_numbers {
+            set re {(?:\s|\n|\A|\(|\>)(#\d+(/\d+)?)(?:(\.(\s|\n))?)}
+        }
+        juick_private_highlight {
+            set re {(^Private message)(?: from @.+:\n)}
+        }
+        juick_citing {
+            set re {(?:\n|\A)(>[^\n]+)}
+        }
+        juick_nicks_tags_my {
+            set re {(?:\s|\n|\A|\(|\>)(@[\w@.-]+|\*[\w?!+'/.-]+)(?:(\.(\s|\n))?)}
+        }
     }
+
+    set matched [regexp -indices -start $at -- $re $what -> bounds]
+    if {!$matched} { return false }
+    lassign $bounds uStart uEnd
+    return true
 }
 
-proc process_juick {atLevel accName} {
-    if {[::richtext::property_exists {JUICK}]} {
-        return [process $atLevel $accName juick]
-    }
-}
-
-proc process_juick_numbers {atLevel accName} {
-    return [process $atLevel $accName juick_numbers]
-}
-
-proc process_citing {atLevel accName} {
-    if {[::richtext::property_exists {JUICK}]} {
-        return [process $atLevel $accName citing]
-    }
-}
-
-proc process_juick_ligth {atLevel accName} {
-    if {[::richtext::property_exists {JUICK}]} {
-       return [process $atLevel $accName juick_ligth]
-    }
-}
-
-proc process_markdown_url_square_brackets {atLevel accName} {
-    if {[::richtext::property_exists {JUICK}]} {
-       return [process $atLevel $accName markdown_url_square_brackets]
-    }
-}
-
-proc process_markdown_url_round_brackets {atLevel accName} {
-    if {[::richtext::property_exists {JUICK}]} {
-       return [process $atLevel $accName markdown_url_round_brackets]
-    }
-}
-
-proc process {atLevel accName what} {
+proc process {what atLevel accName} {
     upvar #$atLevel $accName chunks
+
+    if {![::richtext::property_exists {JUICK}]} { return }
 
     set out {}
 
     foreach {s type tags} $chunks {
-        if {[lsearch -regexp $type (text)|(citing)|(juick_ligth)] < 0} {
+        if {[lsearch -regexp $type (text)|(juick_citing)|(juick_private_highlight)] < 0} {
             # pass through
             lappend out $s $type $tags
             continue
         }
 
-        if {[lsearch -exact $type citing] >=0} {
-            lappend tags CITING
+        if {[lsearch -exact $type juick_citing] >=0} {
+            lappend tags JUICK_CITING
         }
 
-        if {[lsearch -exact $type juick_ligth] >= 0} {
-            lappend tags JLIGTH
+        if {[lsearch -exact $type juick_private_highlight] >= 0} {
+            lappend tags JUICK_PRIVATE_HIGHLIGHT
         }
 
         set index 0; set uStart 0; set uEnd 0
@@ -836,7 +723,7 @@ proc process {atLevel accName what} {
 
             set thing [string range $s $uStart $uEnd]
 
-            if {[string first markdown_url $what] == 0} {
+            if {[string match juick_md_url* $what]} {
                 set title [string range $s $title_start $title_end]
                 set url [string range $s $url_start $url_end]
                 lappend out $url url $tags
@@ -856,23 +743,23 @@ proc process {atLevel accName what} {
     set chunks $out
 }
 
-proc render_juick {w type thing tags args} {
-    if {[lsearch -exact $tags CITING] < 0 && \
-        [lsearch -exact $tags JLIGTH] < 0} \
+proc render_juick_nicks_tags_my {w type thing tags args} {
+    if {[lsearch -exact $tags JUICK_CITING] < 0 && \
+        [lsearch -exact $tags JUICK_PRIVATE_HIGHLIGHT] < 0} \
     {
         if {[string equal [string index $thing 0] "#"]} {
-            set type JNUM
+            set type JUICK_NUMBER
         } elseif {[string equal [string index $thing 0] "*"]} {
-            set type JTAG
+            set type JUICK_TAG
         } elseif {[string equal [string index $thing 0] "@"]} {
-            set type JNICK
+            set type JUICK_NICK
         }
     } else {
-           if {[lsearch -exact $tags CITING] >= 0} {
-               set type CITING
+           if {[lsearch -exact $tags JUICK_CITING] >= 0} {
+               set type JUICK_CITING
            }
-           if {[lsearch -exact $tags JLIGTH] >= 0} {
-               set type JLIGTH
+           if {[lsearch -exact $tags JUICK_PRIVATE_HIGHLIGHT] >= 0} {
+               set type JUICK_PRIVATE_HIGHLIGHT
            }
     }
 
@@ -893,15 +780,15 @@ proc render_juick {w type thing tags args} {
     return $id
 }
 
-proc render_citing {w type thing tags args} {
-    set id CITING-$thing
-    $w insert end $thing [lfuse $tags [list $id $type CITING]]
+proc render_juick_citing {w type thing tags args} {
+    set id JUICK_CITING-$thing
+    $w insert end $thing [lfuse $tags [list $id $type JUICK_CITING]]
     return $id
 }
 
-proc render_juick_ligth {w type thing tags args} {
-    set id JLIGTH-$thing
-    $w insert end $thing [lfuse $tags [list $id $type JLIGTH]]
+proc render_juick_private_highlight {w type thing tags args} {
+    set id JUICK_PRIVATE_HIGHLIGHT-$thing
+    $w insert end $thing [lfuse $tags [list $id $type JUICK_PRIVATE_HIGHLIGHT]]
     return $id
 }
 
