@@ -1,5 +1,4 @@
-package require msgcat
-package require http
+namespace eval juick {}
 
 # XRDB options
 option add *juick.number                blue           widgetDefault
@@ -10,55 +9,15 @@ option add *juick.nick                  red            widgetDefault
 option add *juick.tag                   ForestGreen    widgetDefault
 option add *juick.my_msg                gray           widgetDefault
 
-# Compatibility with old Tkabber version
-if {[string equal $::tkabber_version "0.11.1"]} {
-    set scriptdir [file dirname [info script]]
+# Start this procedure at source file
+juick::preload
 
-    catch {source [file join $scriptdir \
-        tkabber-0.11.1-compatibility.tcl]} \
-        source_compatibility_file_result
-}
-
-namespace eval juick {
-
-variable options
-variable juick_nicknames
-variable chat_things
-
-::msgcat::mcload [file join [file dirname [info script]] msgs]
-
-if {![::plugins::is_registered juick]} {
-    ::plugins::register juick \
-        -namespace [namespace current] \
-        -source [info script] \
-        -description [::msgcat::mc \
-            "Whether the Juick plugin is loaded."] \
-        -loadcommand [namespace code load] \
-        -unloadcommand [namespace code unload]
-    return
-}
-
-custom::defgroup Plugins [::msgcat::mc "Plugins options."] -group Tkabber
-
-set group "Juick"
-custom::defgroup $group \
-    [::msgcat::mc "Juick settings."] \
-    -group Plugins
-
-custom::defvar options(main_jid) "juick@juick.com/Juick" \
-    [::msgcat::mc \
-        "Main Juick JID. This used for forwarding things from other chats."] \
-    -group $group \
-    -type string
-custom::defvar options(special_update_juick_tab) 1 \
-    [format "%s\n%s" \
-        [::msgcat::mc "Indicate as personal message only private messages and replies to you."] \
-        [::msgcat::mc "Your Juick nickname determines at roster receiving, so after enable option you need to reconnecting."]] \
-    -group $group \
-    -type boolean
+variable juick::options
+variable juick::nicknames
+variable juick::chat_things
 
 # list of {name only_parser priority}
-variable juick_richtext_processors { 
+variable juick::richtext_processors { 
     {juick_md_url_square_brackets 1 49}
     {juick_md_url_round_brackets  1 49}
     {juick_numbers                0 54}
@@ -68,7 +27,7 @@ variable juick_richtext_processors {
 }
 
 # list of {hook proc priority orig_proc}
-variable juick_hooks {
+variable juick::plugin_hooks {
     {roster_push_hook          get_juick_nick             99 ""}
     {draw_message_hook         ignore_server_messages      0 ""}
     {draw_message_hook         handle_message             21 ""}
@@ -83,10 +42,49 @@ variable juick_hooks {
         ::::ifacetk::add_number_of_messages_to_title}
 }
 
-proc load {} {
-    variable juick_richtext_processors
+proc juick::preload {} {
+    package require msgcat
+    package require http
 
-    foreach {name only_parser priority} $juick_richtext_processors {
+    # Compatibility with old Tkabber version
+    if {[string equal $::tkabber_version "0.11.1"]} {
+        set scriptdir [file dirname [info script]]
+        set scriptname tkabber-0.11.1-compatibility.tcl 
+        catch {source [file join $scriptdir $scriptname]} res
+    }
+
+    ::msgcat::mcload [file join [file dirname [info script]] msgs]
+
+    # Register plugin for further load/unload via GUI
+    if {![::plugins::is_registered juick]} {
+        ::plugins::register juick \
+            -namespace [namespace current] \
+            -source [info script] \
+            -description [::msgcat::mc \
+                "Whether the Juick plugin is loaded."] \
+            -loadcommand [namespace code load] \
+            -unloadcommand [namespace code unload]
+        return
+    }
+
+    # Create 'Customize -> Plugins -> Juick' menu
+    custom::defgroup Plugins [::msgcat::mc "Plugins options."] \
+        -group Tkabber
+    custom::defgroup Juick [::msgcat::mc "Juick settings."] \
+        -group Plugins
+    custom::defvar options(main_jid) "juick@juick.com/Juick" \
+        [::msgcat::mc "Main Juick JID. This used for forwarding things from other chats."] \
+        -group Juick -type string
+    custom::defvar options(special_update_juick_tab) 1 \
+        [::msgcat::mc "Indicate as personal message only private messages and replies to you.\nYour Juick nickname determines at roster receiving, so after enable option you need to reconnecting."] \
+        -group Juick -type boolean
+}
+
+proc load {} {
+    variable richtext_processors
+    variable plugin_hooks
+
+    foreach {name only_parser priority} $richtext_processors {
         ::richtext::entity_state $name 1
 
         set args {}
@@ -101,7 +99,7 @@ proc load {} {
         ::richtext::register_entity $name $args
     }
 
-    foreach {hook proc priority orig_proc} $juick_hooks {
+    foreach {hook proc priority orig_proc} $plugin_hooks {
         if {![string equal $orig_proc ""]} {
             hook::remove $orig_hook $priority
         }
@@ -111,12 +109,15 @@ proc load {} {
 }
 
 proc unload {} {
-    foreach {name _ _} $juick_richtext_processors {
+    variable richtext_processors
+    variable plugin_hooks
+
+    foreach {name _ _} $richtext_processors {
         ::richtext::unregister_entity $name
         ::richtext::enity_state $name 0
     }
 
-    foreach {hook proc priority orig_proc} $juick_hooks {
+    foreach {hook proc priority orig_proc} $plugin_hooks {
         hook::remove $hook [namespace current]::$proc $priority
 
         if {![string equal $orig_proc ""]} {
@@ -148,7 +149,7 @@ proc is_juick {chatid} {
 
 proc get_juick_nick {xlib jid name groups subsc ask} {
     variable options
-    variable juick_nicknames
+    variable nicknames
 
     if {![info exists options(special_update_juick_tab)] \
         || ! $options(special_update_juick_tab)} \
@@ -156,7 +157,7 @@ proc get_juick_nick {xlib jid name groups subsc ask} {
         return
     }
 
-    if {![is_juick_jid $jid] || [info exists juick_nicknames($jid)]} {
+    if {![is_juick_jid $jid] || [info exists nicknames($jid)]} {
         return
     }
 
@@ -186,7 +187,7 @@ proc get_juick_nick {xlib jid name groups subsc ask} {
             return
         }
 
-        set juick_nicknames($jid) $uname
+        set nicknames($jid) $uname
         return
     }
 
@@ -209,7 +210,7 @@ proc get_juick_nick {xlib jid name groups subsc ask} {
                 }
             }
 
-            set juick_nicknames($jid) $uname
+            set nicknames($jid) $uname
             return
         }
     }
@@ -218,7 +219,7 @@ proc get_juick_nick {xlib jid name groups subsc ask} {
         return
     }
 
-    set juick_nicknames($jid) $uname
+    set nicknames($jid) $uname
 }
 
 proc handle_message {chatid from type body x} {
@@ -239,13 +240,13 @@ proc handle_message {chatid from type body x} {
 }
 
 proc get_my_juick_nickname {jid} {
-    variable juick_nicknames
+    variable nicknames
 
     set uname ""
     set jid [::xmpp::jid::removeResource $jid]
 
-    if {[info exists juick_nicknames($jid)]} {
-        set uname $juick_nicknames($jid)
+    if {[info exists nicknames($jid)]} {
+        set uname $nicknames($jid)
     }
 
     return $uname
