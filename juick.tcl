@@ -16,31 +16,45 @@ variable juick::options
 variable juick::nicknames
 variable juick::chat_things
 
-# list of {name only_parser priority}
+# TODO: reconstructor for md urls
+# list of {name opts priority}
+# where 'opts' is some list of:
+# {configurator, parser, reconstructor, renderer}
 variable juick::richtext_processors { 
-    {juick_md_url_square_brackets 1 49}
-    {juick_md_url_round_brackets  1 49}
-    {juick_numbers                0 54}
-    {juick_private_highlight      0 81}
-    {juick_citing                 0 82}
-    {juick_nicks_tags_my          0 85}
+    {juick_md_url_square_brackets {parser}                         49}
+    {juick_md_url_round_brackets  {parser}                         49}
+    {juick_numbers                {configurator, parser, renderer} 54}
+    {juick_private_highlight      {configurator, parser, renderer} 81}
+    {juick_citing                 {configurator, parser, renderer} 82}
+    {juick_nicks_tags_my          {configurator, parser, renderer} 85}
 }
 
 # list of {hook proc priority orig_proc}
 variable juick::plugin_hooks {
-    {roster_push_hook          get_juick_nick             99 ""}
+    {roster_push_hook          determine_juick_nick       99 ""}
     {draw_message_hook         ignore_server_messages      0 ""}
-    {draw_message_hook         handle_message             21 ""}
-    {chat_window_click_hook    insert_from_window         99 ""}
-    {chat_win_popup_menu_hook  add_juick_things_menu      20 ""}
-    {rewrite_message_hook      rewrite_juick_message      20 ""}
-    {chat_send_message_hook    rewrite_send_juick_message 19 ""}
+    {draw_message_hook         draw_message_handle        21 ""}
+    {chat_window_click_hook    insert_by_click            99 ""}
+    {chat_win_popup_menu_hook  add_chat_things_menu       20 ""}
+    {rewrite_message_hook      rewrite_incoming_message   20 ""}
+    {chat_send_message_hook    rewrite_subscribe_plus_cmd 19 ""}
     {generate_completions_hook juick_commands_comps       99 ""}
     {draw_message_hook         update_juick_tab            8 \
         ::plugins::update_tab::update}
     {draw_message_hook         add_number_to_tab_title    18 \
         ::::ifacetk::add_number_of_messages_to_title}
 }
+
+# utils.tcl procedures:
+# proc juick::is_juick_jid {jid}
+# proc juick::is_juick {chatid}
+# proc juick::get_my_juick_nickname {jid}
+# proc juick::is_personal_juick_message {from body}
+# proc juick::send_to_juick {w body}
+# proc juick::get_juick_thread {w thing}
+# proc juick::receive_juick_thread {jid res child0}
+# proc juick::copy_thing {w thing}
+# proc juick::browse_thing {w thing}
 
 proc juick::preload {} {
     package require msgcat
@@ -50,7 +64,7 @@ proc juick::preload {} {
     if {[string equal $::tkabber_version "0.11.1"]} {
         set scriptdir [file dirname [info script]]
         set scriptname tkabber-0.11.1-compatibility.tcl 
-        catch {source [file join $scriptdir $scriptname]} res
+        source [file join $scriptdir $scriptname]
     }
 
     ::msgcat::mcload [file join [file dirname [info script]] msgs]
@@ -73,29 +87,30 @@ proc juick::preload {} {
     custom::defgroup Juick [::msgcat::mc "Juick settings."] \
         -group Plugins
     custom::defvar options(main_jid) "juick@juick.com/Juick" \
-        [::msgcat::mc "Main Juick JID. This used for forwarding things from other chats."] \
+        [::msgcat::mc "Main Juick JID. This used for \
+            forwarding things from other chats."] \
         -group Juick -type string
     custom::defvar options(special_update_juick_tab) 1 \
-        [::msgcat::mc "Indicate as personal message only private messages and replies to you.\nYour Juick nickname determines at roster receiving, so after enable option you need to reconnecting."] \
+        [::msgcat::mc "Indicate as personal message only private \
+            messages and replies to you.\nYour Juick nickname \
+            determines at roster receiving, so after enable option \
+            you need to reconnecting."] \
         -group Juick -type boolean
 }
 
-proc load {} {
+proc juick::load {} {
     variable richtext_processors
     variable plugin_hooks
 
-    foreach {name only_parser priority} $richtext_processors {
+    foreach {name opts priority} $richtext_processors {
         ::richtext::entity_state $name 1
 
         set args {}
-        lappend args -parser [list [namespace current]::process $name]
-        lappend args -parser-priority $priority
-
-        if {!$only_parser} {
-            lappend args -configurator [list [namespace current]::configure $name]
-            lappend args -renderer [list [namespace current]::render $name]
+        foreach opt $opts {
+            lappend args -$opt [list [namespace current]::$opt $name]
         }
 
+        lappend args -parser-priority $priority
         ::richtext::register_entity $name $args
     }
 
@@ -106,9 +121,12 @@ proc load {} {
 
         hook::add $hook [namespace current]::$proc $priority
     }
+
+    set scriptdir [file dirname [info script]]
+    source [file join $scriptdir utils.tcl]
 }
 
-proc unload {} {
+proc juick::unload {} {
     variable richtext_processors
     variable plugin_hooks
 
@@ -126,28 +144,7 @@ proc unload {} {
     }
 }
 
-proc is_juick_jid {jid} {
-    set jid [::xmpp::jid::removeResource $jid]
-    set node [::xmpp::jid::node $jid]
-    return [expr {[string equal $jid "juick@juick.com"] || \
-        [string equal $node "juick%juick.com"]}]
-
-#    if {$without_resource} { \
-#        return [expr {[string equal $jid "juick@juick.com"] \
-#           || [regexp "juick%juick.com@.+" $jid]}] \
-#    } else { \
-#       return [expr {[string equal $jid "juick@juick.com/Juick"] \
-#           || [regexp "juick%juick.com@.+/Juick" $jid]}] \
-#    }
-}
-
-# Determines whether given chatid correspond to Juick
-proc is_juick {chatid} {
-    set jid [chat::get_jid $chatid]
-    return [is_juick_jid $jid]
-}
-
-proc get_juick_nick {xlib jid name groups subsc ask} {
+proc juick::determine_juick_nick {xlib jid name groups subsc ask} {
     variable options
     variable nicknames
 
@@ -161,8 +158,11 @@ proc get_juick_nick {xlib jid name groups subsc ask} {
         return
     }
 
+    # TODO
     # For Juick contacts connected via j2j transport is difficult
     # to determine user jid.
+    # Idea: send iq register to proper j2j, get form, and read
+    # second JID from it.
     if {[string first % $jid] >= 0} {
         return
     }
@@ -222,7 +222,7 @@ proc get_juick_nick {xlib jid name groups subsc ask} {
     set nicknames($jid) $uname
 }
 
-proc handle_message {chatid from type body x} {
+proc juick::draw_message_handle {chatid from type body x} {
     if {![is_juick $chatid]} return
 
     ::richtext::property_add {JUICK} {}
@@ -230,48 +230,16 @@ proc handle_message {chatid from type body x} {
     set chatw [chat::chat_win $chatid]
     set jid [chat::get_jid $chatid]
 
-    set tags {}
-    if {![string equal $jid $from]} {
-        lappend tags JUICK_MY_MSG
+    if {[string equal $jid $from]} {
+        ::richtext::render_message $chatw $body {JUICK_MY_MSG}
+    } else {
+        ::richtext::render_message $chatw $body {}
     }
 
-    ::richtext::render_message $chatw $body $tags
     return stop
 }
 
-proc get_my_juick_nickname {jid} {
-    variable nicknames
-
-    set uname ""
-    set jid [::xmpp::jid::removeResource $jid]
-
-    if {[info exists nicknames($jid)]} {
-        set uname $nicknames($jid)
-    }
-
-    return $uname
-}
-
-proc is_personal_juick_message {from body} {
-    variable options
-
-    set private_msg [regexp {^Private message from @.+:\n} $body]
-
-    set reply_to_comment [regexp \
-        {Reply by @[^\n ]+:\n>.+\n\n@([^\n ]+) .+\n\n#\d+/\d+ http://juick.com/\d+#\d+$} \
-        $body -> reply_to_nick]
-
-    if {$reply_to_comment} {
-        set reply_to_me [string equal \
-            [get_my_juick_nickname $from] $reply_to_nick]
-    } else {
-        set reply_to_me 0
-    }
-
-    return [expr {$private_msg || $reply_to_me}]
-}
-
-proc update_juick_tab {chatid from type body x} {
+proc juick::update_juick_tab {chatid from type body x} {
     variable options
     if {!([is_juick_jid $from] && [string equal $type "chat"] \
         && $options(special_update_juick_tab))} \
@@ -299,14 +267,14 @@ proc update_juick_tab {chatid from type body x} {
     }
 }
 
-proc ignore_server_messages {chatid from type body x} {
+proc juick::ignore_server_messages {chatid from type body x} {
     if {[is_juick $chatid] && $from eq ""} {
         return stop
     }
 }
 
 # Add number of messages from Juick to the tab title
-proc add_number_to_tab_title {chatid from type body x} {
+proc juick::add_number_to_tab_title {chatid from type body x} {
     variable options
     if {!([is_juick_jid $from] && [string equal $type "chat"] \
         && $options(special_update_juick_tab))} \
@@ -342,7 +310,7 @@ proc add_number_to_tab_title {chatid from type body x} {
     ::ifacetk::update_main_window_title
 }
 
-proc rewrite_juick_message \
+proc juick::rewrite_incoming_message \
      {vxlib vfrom vid vtype vis_subject vsubject \
       vbody verr vthread vpriority vx} {
     upvar 2 $vfrom from
@@ -383,7 +351,7 @@ proc rewrite_juick_message \
     }
 }
 
-proc rewrite_send_juick_message {chatid user body type} {
+proc juick::rewrite_subscribe_plus_cmd {chatid user body type} {
     if {![is_juick $chatid] || ![string equal $type "chat"]} {
         return
     }
@@ -400,7 +368,7 @@ proc rewrite_send_juick_message {chatid user body type} {
     }
 }
 
-proc insert_from_window {chatid w x y} {
+proc juick::insert_by_click {chatid w x y} {
     variable options
     set thing ""
     set cw [chat::chat_win $chatid]
@@ -433,7 +401,7 @@ proc insert_from_window {chatid w x y} {
     return stop
 }
 
-proc add_juick_things_menu {m chatwin X Y x y} {
+proc juick::add_chat_things_menu {m chatwin X Y x y} {
     set thing ""
     set tags [$chatwin tag names "@$x,$y"]
 
@@ -452,13 +420,15 @@ proc add_juick_things_menu {m chatwin X Y x y} {
         -command [list [namespace current]::browse_thing $chatwin $thing]
 
     if {[regexp {#\d+$} $thing]} {
-# Currently not implemented.
-if {0} {
-        $m add command -label [::msgcat::mc \
-            "\[J\] Open in new tab"] \
-            -command [list [namespace current]::get_juick_thread \
-            $chatwin $thing]
-}
+####################
+        # Currently not implemented.
+        if {0} {
+            $m add command -label [::msgcat::mc \
+                "\[J\] Open in new tab"] \
+                -command [list [namespace current]::get_juick_thread \
+                $chatwin $thing]
+        }
+####################
 
         $m add command -label [::msgcat::mc \
             "\[J\] Subscribe"] \
@@ -472,94 +442,14 @@ if {0} {
     }
 }
 
-proc send_to_juick {w body} {
-    variable options
-    set cw [join [lrange [split $w .] 0 end-1] .]
-    set chatid [chat::winid_to_chatid $cw]
-    set xlib [chat::get_xlib $chatid]
-    set jid [chat::get_jid $chatid]
-
-    if {![is_juick_jid $jid]} {
-        set mainchat [chat::chatid $xlib $options(main_jid)]
-        set jid [chat::get_jid $mainchat]
-    }
-
-    message::send_msg $xlib $jid -type chat -body $body
-}
-
-proc get_juick_thread {w thing} {
-    set cw [join [lrange [split $w .] 0 end-1] .]
-    set chatid [chat::winid_to_chatid $cw]
-    set xlib [chat::get_xlib $chatid]
-    set jid [chat::get_jid $chatid]
-    set mid [string range $thing 1 end]
-
-    ::xmpp::sendIQ $xlib get \
-        -query [::xmpp::xml::create query \
-            -xmlns "http://juick.com/query#messages" \
-            -attrs [list mid $mid]] \
-        -to $jid \
-        -command [list [namespace current]::receive_juick_thread $jid]
-}
-
-proc receive_juick_thread {jid res child0} {
-    if {![string equal $res ok]} return
-
-    ::xmpp::xml::split $child0 tag0 xmlns0 attrs0 cdata0 subels0
-
-    if {![string equal $xmlns0 "http://juick.com/query#messages"]} return
-
-    set child1 [lindex $subels0 0]
-    ::xmpp::xml::split $child1 tag1 xmlns1 attrs1 cdata1 subels1
-
-    if {![string equal $xmlns1 "http://juick.com/message"]} return
-
-    set msg ""
-
-    foreach child2 $subels1 {
-        ::xmpp::xml::split $child2 tag2 xmlns2 attrs2 cdata2 subels2
-        switch -- $tag2 {
-            body {
-                set msg $cdata2
-            }
-        }
-    }
-
-    #puts "Get message from $jid: \"$msg\""
-
-    # open new tab
-
-    return
-}
-
-proc copy_thing {w thing} {
-    clipboard clear -displayof $w
-    clipboard append -displayof $w $thing
-}
-
-proc browse_thing {w thing} {
-    switch -regexp -- $thing {
-        {^#} {
-          regsub -- "/" [string range $thing 1 end] "#" jurl
-          browseurl http://juick.com/$jurl
-          }
-        {^@} {
-          browseurl http://juick.com/[string range $thing 1 end]
-          }
-        {^\*} {
-          browseurl http://juick.com/tag/[string range $thing 1 end]
-          }
-    }
-}
-
 # See commented code in juick_commands_comps.
 #variable commands {HELP NICK LOGIN "S " "U " ON OFF "D " "BL " "WL " "PM " VCARD PING INVITE}
 variable commands {HELP NICK LOGIN S U ON OFF D BL WL PM CARD PING INVITE}
-proc correct_command {chatid user body type} {
+proc juick::correct_command {chatid user body type} {
    # Maybe once I'll get arount to it
 }
 
-proc juick_commands_comps {chatid compsvar wordstart line} {
+proc juick::juick_commands_comps {chatid compsvar wordstart line} {
     if {![is_juick $chatid]} return
 
     upvar 0 $compsvar comps
@@ -569,20 +459,23 @@ proc juick_commands_comps {chatid compsvar wordstart line} {
     if {!$wordstart} {
        set comps [concat $commands $comps]
     } else {
-if {0} {
-        # This code don't work.
-        # See ${PATH_TO_TKABBER}/plugins/chat/completion.tcl at line 94.
-        # Idea: use *rename* for procedure completion::complete.
-        set q 0
-        foreach cmd $commands {
-            if {[string equal -length [string length $cmd] $cmd $line]} {
-                set q 1
-                break
+####################
+        # Currently not implemented.
+        if {0} {
+            # This code don't work.
+            # See ${PATH_TO_TKABBER}/plugins/chat/completion.tcl at line 94.
+            # Idea: use *rename* for procedure completion::complete.
+            set q 0
+            foreach cmd $commands {
+                if {[string equal -length [string length $cmd] $cmd $line]} {
+                    set q 1
+                    break
+                }
             }
-        }
 
-        if {!$q} return
-}
+            if {!$q} return
+        }
+####################
     }
 
     if {[info exist chat_things($chatid)]} {
@@ -593,7 +486,7 @@ if {0} {
 # --------------
 # RichText stuff
 
-proc configure {what w} {
+proc juick::configurator {what w} {
     switch -exact $what {
         juick_numbers {
             set options(juick.number) [option get $w juick.number Text]
@@ -627,7 +520,7 @@ proc configure {what w} {
     }
 }
 
-proc spot_markdown_url {type what at startVar endVar} {
+proc juick::spot_markdown_url {type what at startVar endVar} {
     variable ::plugins::urls::url_regexp
 
     switch -exact $type {
@@ -664,7 +557,7 @@ proc spot_markdown_url {type what at startVar endVar} {
     return true
 }
 
-proc spot {type what at startVar endVar} {
+proc juick::spot {type what at startVar endVar} {
     upvar 1 $startVar uStart $endVar uEnd
 
     switch -glob $type {
@@ -691,7 +584,7 @@ proc spot {type what at startVar endVar} {
     return true
 }
 
-proc process {what atLevel accName} {
+proc juick::parser {what atLevel accName} {
     upvar #$atLevel $accName chunks
 
     if {![::richtext::property_exists {JUICK}]} { return }
@@ -744,16 +637,32 @@ proc process {what atLevel accName} {
     set chunks $out
 }
 
-proc render_juick_nicks_tags_my {w type thing tags args} {
+proc juick::renderer_juick_numbers_nicks_tags_my {w type thing tags args} {
+    switch -glob $type {
+        markdown_url* {
+            return [spot_markdown_url $type $what $at uStart uEnd]
+        }
+        spot_juick_numbers {
+            set re {(?:\s|\n|\A|\(|\>)(#\d+(/\d+)?)(?:(\.(\s|\n))?)}
+        }
+        juick_private_highlight {
+            set re {(^Private message)(?: from @.+:\n)}
+        }
+        juick_citing {
+            set re {(?:\n|\A)(>[^\n]+)}
+        }
+        juick_nicks_tags_my {
+            set re {(?:\s|\n|\A|\(|\>)(@[\w@.-]+|\*[\w?!+'/.-]+)(?:(\.(\s|\n))?)}
+        }
+    }
+
     if {[lsearch -exact $tags JUICK_CITING] < 0 && \
         [lsearch -exact $tags JUICK_PRIVATE_HIGHLIGHT] < 0} \
     {
-        if {[string equal [string index $thing 0] "#"]} {
-            set type JUICK_NUMBER
-        } elseif {[string equal [string index $thing 0] "*"]} {
-            set type JUICK_TAG
-        } elseif {[string equal [string index $thing 0] "@"]} {
-            set type JUICK_NICK
+        switch -exact [string index $thing 0] {
+            "#" { set type JUICK_NUMBER }
+            "*" { set type JUICK_TAG    }
+            "@" { set type JUICK_NICK   }
         }
     } else {
            if {[lsearch -exact $tags JUICK_CITING] >= 0} {
@@ -781,13 +690,13 @@ proc render_juick_nicks_tags_my {w type thing tags args} {
     return $id
 }
 
-proc render_juick_citing {w type thing tags args} {
+proc juick::render_juick_citing {w type thing tags args} {
     set id JUICK_CITING-$thing
     $w insert end $thing [lfuse $tags [list $id $type JUICK_CITING]]
     return $id
 }
 
-proc render_juick_private_highlight {w type thing tags args} {
+proc juick::render_juick_private_highlight {w type thing tags args} {
     set id JUICK_PRIVATE_HIGHLIGHT-$thing
     $w insert end $thing [lfuse $tags [list $id $type JUICK_PRIVATE_HIGHLIGHT]]
     return $id
