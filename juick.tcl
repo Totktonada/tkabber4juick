@@ -60,7 +60,8 @@ proc load {} {
     ::richtext::entity_state citing 1
     ::richtext::entity_state juick 1
     ::richtext::entity_state juick_ligth 1
-    ::richtext::entity_state markdown_url 1
+    ::richtext::entity_state markdown_url_square_brackets 1
+    ::richtext::entity_state markdown_url_round_brackets 1
 
     ::richtext::register_entity juick_numbers \
         -configurator [namespace current]::configure_juick_numbers \
@@ -86,8 +87,12 @@ proc load {} {
         -renderer [namespace current]::render_juick \
         -parser-priority 85
 
-    ::richtext::register_entity markdown_url \
-	    -parser [namespace current]::process_markdown_urls \
+    ::richtext::register_entity markdown_url_square_brackets \
+	    -parser [namespace current]::process_markdown_url_square_brackets \
+	    -parser-priority 49
+
+    ::richtext::register_entity markdown_url_round_brackets \
+	    -parser [namespace current]::process_markdown_url_round_brackets \
 	    -parser-priority 49
 
     hook::add draw_message_hook        \
@@ -131,7 +136,8 @@ proc unload {} {
     ::richtext::unregister_entity citing
     ::richtext::unregister_entity juick
     ::richtext::unregister_entity juick_ligth
-    ::richtext::unregister_entity process_markdown_urls
+    ::richtext::unregister_entity process_markdown_url_square_brackets
+    ::richtext::unregister_entity process_markdown_url_round_brackets
 
     hook::remove draw_message_hook        \
         [namespace current]::ignore_server_messages 0
@@ -719,20 +725,23 @@ proc spot_juick_numbers {what at startVar endVar} {
     return true
 }
 
-proc spot_markdown_url {what at startVar endVar} {
+proc spot_markdown_url {type what at startVar endVar} {
     variable ::plugins::urls::url_regexp
 
-    # [title][URL]
-    set matched [regexp -indices -start $at -- \
-        {(\[([^\]]+)\]\[([^\]]+)\])} $what -> \
-        bounds title_bounds url_bounds]
-
-    if {!$matched} {
-        # [title](URL)
-        set matched [regexp -indices -start $at -- \
-            {(\[([^\]]+)\]\(([^\)]+)\))} $what -> \
-            bounds title_bounds url_bounds]
+    switch -exact $type {
+        markdown_url_square_brackets {
+            # [title][URL]
+            set md_regexp {(\[([^\]]+)\]\[([^\]]+)\])}
+        }
+        markdown_url_round_brackets {
+            # [title](URL)
+            set md_regexp {(\[([^\]]+)\]\(([^\)]+)\))}
+        }
     }
+
+    set matched [regexp -indices -start $at -- \
+        $md_regexp $what -> \
+        bounds title_bounds url_bounds]
 
     if {!$matched} { return false }
 
@@ -745,12 +754,21 @@ proc spot_markdown_url {what at startVar endVar} {
 
     upvar 1 $startVar uStart $endVar uEnd
     lassign $bounds uStart uEnd
-    upvar 1 title_start title_start title_end title_end
+    upvar 2 title_start title_start title_end title_end
     lassign $title_bounds title_start title_end
-    upvar 1 url_start url_start url_end url_end
+    upvar 2 url_start url_start url_end url_end
     lassign $url_bounds url_start url_end
 
     return true
+}
+
+proc spot {type what at startVar endVar} {
+    upvar 1 $startVar uStart $endVar uEnd
+
+    switch -glob $type {
+        markdown_url* { spot_markdown_url $type $what $at uStart uEnd}
+        default       { spot_$type $what $at uStart uEnd}
+    }
 }
 
 proc process_juick {atLevel accName} {
@@ -775,9 +793,15 @@ proc process_juick_ligth {atLevel accName} {
     }
 }
 
-proc process_markdown_urls {atLevel accName} {
+proc process_markdown_url_square_brackets {atLevel accName} {
     if {[::richtext::property_exists {JUICK}]} {
-       return [process $atLevel $accName markdown_url]
+       return [process $atLevel $accName markdown_url_square_brackets]
+    }
+}
+
+proc process_markdown_url_round_brackets {atLevel accName} {
+    if {[::richtext::property_exists {JUICK}]} {
+       return [process $atLevel $accName markdown_url_round_brackets]
     }
 }
 
@@ -802,7 +826,7 @@ proc process {atLevel accName what} {
         }
 
         set index 0; set uStart 0; set uEnd 0
-        while {[eval {spot_$what $s $index uStart uEnd}]} {
+        while {[eval {spot $what $s $index uStart uEnd}]} {
             if {$uStart - $index > 0} {
                 # Write out text before current thing, if any:
                 lappend out \
@@ -812,7 +836,7 @@ proc process {atLevel accName what} {
 
             set thing [string range $s $uStart $uEnd]
 
-            if {[string equal $what markdown_url]} {
+            if {[string first markdown_url $what] == 0} {
                 set title [string range $s $title_start $title_end]
                 set url [string range $s $url_start $url_end]
                 lappend out $url url $tags
