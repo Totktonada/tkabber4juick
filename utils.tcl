@@ -4,6 +4,17 @@ if {[info exist ::juick-utils-tcl-sentry]} {
 
 set ::juick-utils-tcl-sentry 1
 
+proc juick::get_clickable_thing_at {w x y} {
+    set tags [$w tag names "@$x,$y"]
+
+    if {[lsearch -exact $tags juick_clickable] >= 0} {
+        lassign [$w tag prevrange juick_clickable "@$x,$y + 1c"] idx1 idx2
+        return [$w get $idx1 $idx2]
+    }
+
+    return ""
+}
+
 proc juick::get_tags_list {} {
     variable richtext_tags
     set res {}

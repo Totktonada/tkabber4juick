@@ -4,8 +4,8 @@
 ::msgcat::mcset ru "\[J\] Subscribe"            "\[J\] Подписаться"
 ::msgcat::mcset ru "\[J\] Unsubscribe"          "\[J\] Отписаться"
 
-::msgcat::mcset ru "Whether the Juick plugin is loaded" \
-"Загружено ли расширение для удобной работы с Juick"
+::msgcat::mcset ru "Whether the Juick plugin is loaded." \
+"Загружено ли расширение для удобной работы с Juick."
 
 ::msgcat::mcset ru "Juick settings." \
 "Параметры расширения для удобной работы с Juick."

@@ -1,4 +1,7 @@
 # For list XRDB options find 'option add' lines.
+# TODO: reconstructor for md urls
+# TODO: jubo #dddddd
+# TODO: j2j, see below.
 
 namespace eval juick {
 
@@ -66,7 +69,6 @@ variable commands {
     HELP NICK LOGIN ON OFF VCARD PING INVITE
 }
 
-# TODO: reconstructor for md urls
 # list of {name priority} sequences
 variable richtext_parsers { 
     juick_md_url_square_brackets  49
@@ -395,17 +397,10 @@ proc juick::rewrite_subscribe_plus_cmd {chatid user body type} {
 
 proc juick::insert_by_click {chatid w x y} {
     variable options
-    set thing ""
-    set cw [chat::chat_win $chatid]
+
     set ci [chat::input_win $chatid]
     set jid [::xmpp::jid::removeResource [chat::get_jid $chatid]]
-
-    set tags [$cw tag names "@$x,$y"]
-
-    if {[set idx [lsearch -glob $tags JUICK-*]] >= 0} {
-        set thing [string range [lindex $tags $idx] 6 end]
-    }
-
+    set thing [get_clickable_thing_at $w $x $y]
     if {$thing eq ""} return
 
     if {![is_juick_jid $jid]} {
@@ -427,13 +422,7 @@ proc juick::insert_by_click {chatid w x y} {
 }
 
 proc juick::add_chat_things_menu {m chatwin X Y x y} {
-    set thing ""
-    set tags [$chatwin tag names "@$x,$y"]
-
-    if {[set idx [lsearch -glob $tags JUICK-*]] >= 0} {
-        set thing [string range [lindex $tags $idx] 6 end]
-    }
-
+    set thing [get_clickable_thing_at $chatwin $x $y]
     if {$thing eq ""} return
 
     $m add command -label [format [::msgcat::mc \
@@ -489,6 +478,8 @@ proc juick::juick_commands_comps {chatid compsvar wordstart line} {
 proc juick::configurator {w} {
     variable options
     variable richtext_tags
+
+    # TODO: check window for juick/jubo and exit if not on it.
 
     foreach {tag_name xrdb_name xrdb_option} $richtext_tags {
         if {$xrdb_name ne ""} {
@@ -548,7 +539,7 @@ proc juick::parser_spot_md_url {ptype what at startVar endVar url_infoVar} {
     upvar 1 $startVar uStart $endVar uEnd
     lassign $bounds uStart uEnd
 
-    lset url_info $title $url
+    set url_info [list $title $url]
 
     return true
 }
@@ -653,11 +644,6 @@ proc juick::parser {ptype atLevel accName} {
 }
 
 proc juick::renderer {w type piece tags} {
-    # tmp; TODO: remove
-    if {[lsearch -exact {"#" "@" "*"} [string index $piece 0]] >= 0} {
-        lappend tags JUICK-$piece
-    }
-
     $w insert end $piece $tags
 }
 
