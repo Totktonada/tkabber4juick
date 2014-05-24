@@ -127,7 +127,6 @@ proc ::xmpp::xml::split {xmldata tagVar xmlnsVar attrsVar \
     }
 }
 
-
 proc ::xmpp::xml::create {tag args} {
     set invoke [list jlib::wrapper:createtag $tag -vars]
 

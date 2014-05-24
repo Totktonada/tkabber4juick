@@ -1,96 +1,137 @@
-namespace eval juick {}
+# For list XRDB options find 'option add' lines.
 
-# Start this procedure at source file
-juick::preload
+namespace eval juick {
+
+package require msgcat
+set scriptdir [file dirname [info script]]
+::msgcat::mcload [file join $scriptdir msgs]
+
+# Register plugin for further load/unload via GUI.
+# Stop loading (by source) file, if plugin currently is not registered.
+if {![::plugins::is_registered juick]} {
+    ::plugins::register juick \
+        -namespace [namespace current] \
+        -source [info script] \
+        -description [::msgcat::mc \
+            "Whether the Juick plugin is loaded."] \
+        -loadcommand [namespace code load] \
+        -unloadcommand [namespace code unload]
+    puts "!!!!"
+    return
+}
+puts "...pass through..."
+
+# Tcl 8.5 for {*}, see http://wiki.tcl.tk/17158
+# TODO: unused?
+# package require Tcl 8.5
+package require http
+
+# Compatibility with old Tkabber version
+if {$::tkabber_version eq "0.11.1"} {
+    set scriptname tkabber-0.11.1-compatibility.tcl 
+    source [file join $scriptdir $scriptname]
+}
+
+source [file join $scriptdir utils.tcl]
 
 # XRDB options
-option add *juick.number                blue           widgetDefault
-option add *juick.private.fg            blue           widgetDefault
-option add *juick.private.bg            #FF9A15        widgetDefault
-option add *juick.citing                gray35         widgetDefault
-option add *juick.nick                  red            widgetDefault
-option add *juick.tag                   ForestGreen    widgetDefault
-option add *juick.my_msg                gray           widgetDefault
+option add *juick.number      blue         widgetDefault
+option add *juick.private_fg  blue         widgetDefault
+option add *juick.private_bg  #FF9A15      widgetDefault
+option add *juick.citing      gray35       widgetDefault
+option add *juick.nick        red          widgetDefault
+option add *juick.tag         ForestGreen  widgetDefault
+option add *juick.my_msg      gray         widgetDefault
 
-# list of {tag_name xrdb_name xrdb_option}
+# Global variables and constants
+# ==============================
+
+variable options
+variable nicknames
+
+# list of {tag_name xrdb_name xrdb_option} sequences
 # used in 'configurator' proc
-variable juick::richtext_tags {
-    {juick_number  juick.number     foreground}
-    {juick_private juick.private.fg foreground}
-    {juick_private juick.private.bg background}
-    {juick_citing  juick.citing     foreground}
-    {juick_nick    juick.nick       foreground}
-    {juick_tag     juick.tag        foreground}
-    {juick_my_msg  juick.my_msg     foreground}
+variable richtext_tags {
+    juick_number  juick.number     foreground
+    juick_private juick.private_fg foreground
+    juick_private juick.private_bg background
+    juick_citing  juick.citing     foreground
+    juick_nick    juick.nick       foreground
+    juick_tag     juick.tag        foreground
+    juick_my_msg  juick.my_msg     foreground
 }
 
-variable juick::options
-variable juick::nicknames
-
-# for tab completition, will be removed soon
-variable juick::chat_things
-
-# See commented code in juick_commands_comps, variable currently unused
+# See commented code in juick_commands_comps
 # variable juick::commands {HELP NICK LOGIN "S " "U " ON OFF "D " "BL " "WL " "PM " VCARD PING INVITE}
 # or
-# variable juick::commands {HELP NICK LOGIN S U ON OFF D BL WL PM CARD PING INVITE}
+variable commands {HELP NICK LOGIN S U ON OFF D BL WL PM VCARD PING INVITE}
 
 # TODO: reconstructor for md urls
-# list of {name opts priority}
-# where 'opts' is some list of:
-# {configurator, parser, reconstructor, renderer}
-variable juick::richtext_parsers { 
-    {juick_md_url_square_brackets {parser}                 49}
-    {juick_md_url_round_brackets  {parser}                 49}
-    {juick_number                 {parser}                 54}
-    {juick_private                {parser}                 81}
-    {juick_citing                 {parser}                 82}
-    {juick_nicks_tags             {parser}                 85}
-    {juick_common                 {configurator, renderer} 85}
+# list of {name priority} sequences
+variable richtext_parsers { 
+    juick_md_url_square_brackets  49
+    juick_md_url_round_brackets   49
+    juick_number                  54
+    juick_private                 81
+    juick_citing                  82
+    juick_nicks_tags              85
 }
 
-# list of {hook proc priority orig_proc}
-variable juick::plugin_hooks {
-    {roster_push_hook          determine_juick_nick       99 ""}
-    {draw_message_hook         ignore_server_messages      0 ""}
-    {draw_message_hook         draw_message_handle        21 ""}
-    {chat_window_click_hook    insert_by_click            99 ""}
-    {chat_win_popup_menu_hook  add_chat_things_menu       20 ""}
-    {rewrite_message_hook      rewrite_incoming_message   20 ""}
-    {chat_send_message_hook    rewrite_subscribe_plus_cmd 19 ""}
-    {generate_completions_hook juick_commands_comps       99 ""}
-    {draw_message_hook         update_juick_tab            8 \
-        ::plugins::update_tab::update}
-    {draw_message_hook         add_number_to_tab_title    18 \
-        ::::ifacetk::add_number_of_messages_to_title}
+# list of {hook proc priority orig_proc} sequences
+variable plugin_hooks {
+    roster_push_hook          determine_juick_nick       99 ""
+    draw_message_hook         ignore_server_messages      0 ""
+    draw_message_hook         draw_message_handle        21 ""
+    chat_window_click_hook    insert_by_click            99 ""
+    chat_win_popup_menu_hook  add_chat_things_menu       20 ""
+    rewrite_message_hook      rewrite_incoming_message   20 ""
+    chat_send_message_hook    rewrite_subscribe_plus_cmd 19 ""
+    generate_completions_hook juick_commands_comps       99 ""
+    draw_message_hook         update_juick_tab            8 \
+        ::plugins::update_tab::update
+    draw_message_hook         add_number_to_tab_title    18 \
+        ::::ifacetk::add_number_of_messages_to_title
 }
 
-proc juick::preload {} {
-    package require msgcat
-    package require http
+# namespace juick
+}
 
-    # Compatibility with old Tkabber version
-    if {$::tkabber_version eq "0.11.1"} {
-        set scriptdir [file dirname [info script]]
-        set scriptname tkabber-0.11.1-compatibility.tcl 
-        source [file join $scriptdir $scriptname]
+# Procedures
+# ==========
+
+proc juick::load {} {
+    puts "LOAD"
+    variable richtext_parsers
+    variable plugin_hooks
+
+    ::richtext::entity_state juick_config 0
+    ::richtext::register_entity juick_config \
+        -configurator [namespace current]::configurator
+
+    foreach tag_name [get_tags_list] {
+        ::richtext::entity_state $tag_name 0
+        ::richtext::register_entity $tag_name \
+            -renderer [namespace current]::renderer
     }
 
-    ::msgcat::mcload [file join [file dirname [info script]] msgs]
+    foreach {name priority} $richtext_parsers {
+        ::richtext::entity_state $name 1
+        ::richtext::register_entity $name \
+            -parser [list [namespace current]::parser $name] \
+            -parser-priority $priority
+    }
 
-    # Register plugin for further load/unload via GUI
-    if {![::plugins::is_registered juick]} {
-        ::plugins::register juick \
-            -namespace [namespace current] \
-            -source [info script] \
-            -description [::msgcat::mc \
-                "Whether the Juick plugin is loaded."] \
-            -loadcommand [namespace code load] \
-            -unloadcommand [namespace code unload]
-        return
+    foreach {hook proc priority orig_proc} $plugin_hooks {
+        if {$orig_proc ne ""} {
+            hook::remove $hook $orig_proc $priority
+        }
+
+        hook::add $hook [namespace current]::$proc $priority
     }
 
     # Create 'Customize -> Plugins -> Juick' menu
+    # Note: we not touch it in 'unload' proc for ability of tuning parameters
+    # with unloaded plugin.
     custom::defgroup Plugins [::msgcat::mc "Plugins options."] \
         -group Tkabber
     custom::defgroup Juick [::msgcat::mc "Juick settings."] \
@@ -107,56 +148,26 @@ proc juick::preload {} {
         -group Juick -type boolean
 }
 
-proc juick::load {} {
-    variable richtext_parsers
-    variable plugin_hooks
-
-    foreach {name opts priority} $richtext_parsers {
-        ::richtext::entity_state $name 1
-
-        set args {}
-        foreach opt $opts {
-            if {[lsearch -exact $opt {configurator parser}] >= 0} {
-                lappend args -$opt [list [namespace current]::$opt $name]
-            }
-        }
-
-        foreach opt $opts {
-            if {[lsearch -exact $opt {reconstructor renderer}] >= 0} {
-                lappend args -$opt [namespace current]::$opt
-            }
-        }
-
-        lappend args -parser-priority $priority
-        ::richtext::register_entity $name $args
-    }
-
-    foreach {hook proc priority orig_proc} $plugin_hooks {
-        if {ne $orig_proc ""} {
-            hook::remove $orig_hook $priority
-        }
-
-        hook::add $hook [namespace current]::$proc $priority
-    }
-
-    set scriptdir [file dirname [info script]]
-    source [file join $scriptdir utils.tcl]
-}
-
 proc juick::unload {} {
     variable richtext_parsers
     variable plugin_hooks
 
-    foreach {name _ _} $richtext_parsers {
+    ::richtext::unregister_entity juick_config
+
+    foreach tag_name [get_tags_list] {
+        ::richtext::unregister_entity $tag_name
+    }
+
+    foreach {name _} $richtext_parsers {
+        ::richtext::entity_state $name 0
         ::richtext::unregister_entity $name
-        ::richtext::enity_state $name 0
     }
 
     foreach {hook proc priority orig_proc} $plugin_hooks {
         hook::remove $hook [namespace current]::$proc $priority
 
         if {$orig_proc ne ""} {
-            hook::add $orig_hook $priority
+            hook::add $hook $orig_proc $priority
         }
     }
 }
@@ -247,8 +258,8 @@ proc juick::draw_message_handle {chatid from type body x} {
     set chatw [chat::chat_win $chatid]
     set jid [chat::get_jid $chatid]
 
-    if {$jid eq $from} {
-        ::richtext::render_message $chatw $body {JUICK_MY_MSG}
+    if {$jid ne $from} {
+        ::richtext::render_message $chatw $body {juick_my_msg}
     } else {
         ::richtext::render_message $chatw $body {}
     }
@@ -497,13 +508,16 @@ proc juick::juick_commands_comps {chatid compsvar wordstart line} {
 # --------------
 
 proc juick::configurator {w} {
-    foreach {tag_name xrdb_name xrdb_option} $xrdb_options {
-        set options($name) [option get $w $name Text]
-        $w tag configure $tag -$opt $options($name)
+    variable options
+    variable richtext_tags
+
+    foreach {tag_name xrdb_name xrdb_option} $richtext_tags {
+        set options($xrdb_name) [option get $w $xrdb_name Text]
+        $w tag configure $tag_name -$xrdb_option $options($xrdb_name)
     }
 
     # Display all things and citing in our message with 'my message' colors.
-    $w tag raise my_msg juick_citing
+    $w tag raise juick_my_msg juick_citing
 
     # Display all things in citing with citing colors.
     # Priorities not affect clickableness.
@@ -519,11 +533,11 @@ proc juick::configurator {w} {
     $w tag raise juick_tag    juick_private
 }
 
-proc juick::parser_spot_md_url {type what at startVar endVar urlInfoVar} {
+proc juick::parser_spot_md_url {ptype what at startVar endVar url_infoVar} {
     variable ::plugins::urls::url_regexp
-    upvar 1 urlInfoVar urlInfo
+    upvar 1 $url_infoVar url_info
  
-    switch -exact $type {
+    switch -exact $ptype {
         juick_md_url_square_brackets {
             # [title][URL]
             set md_regexp {(\[([^\]]+)\]\[([^\]]+)\])}
@@ -553,19 +567,19 @@ proc juick::parser_spot_md_url {type what at startVar endVar urlInfoVar} {
     upvar 1 $startVar uStart $endVar uEnd
     lassign $bounds uStart uEnd
 
-    lset urlInfo $title $url
+    lset url_info $title $url
 
     return true
 }
 
-proc juick::parser_spot {ptype what at startVar endVar typeVar urlInfoVar} {
+proc juick::parser_spot {ptype what at startVar endVar thing_typeVar url_infoVar} {
     upvar 1 $startVar uStart $endVar uEnd
-    upvar 1 typeVar type urlInfoVar urlInfo
-    set urlInfo {}
+    upvar 1 $thing_typeVar thing_type $url_infoVar url_info
 
     switch -glob $ptype {
         juick_md_url* {
-            return [spot_md_url $ptype $what $at uStart uEnd typeVar urlInfo]
+            set thing_type $ptype
+            return [parser_spot_md_url $ptype $what $at uStart uEnd url_info]
         }
         juick_number {
             set re {(?:\s|\n|\A|\(|\>)(#\d+(/\d+)?)(?:(\.(\s|\n))?)}
@@ -584,41 +598,42 @@ proc juick::parser_spot {ptype what at startVar endVar typeVar urlInfoVar} {
     set matched [regexp -indices -start $at -- $re $what -> bounds]
     if {!$matched} { return false }
     lassign $bounds uStart uEnd
-    set thing [string range $s $uStart $uEnd]
+    set thing [string range $what $uStart $uEnd]
 
-    if {$ptype eq juick_nicks_tags} {
+    if {$ptype eq "juick_nicks_tags"} {
         switch -exact [string index $thing 0] {
-            "@" { set type juick_nick   }
-            "*" { set type juick_tag    }
+            "@" { set thing_type juick_nick   }
+            "*" { set thing_type juick_tag    }
         }
     } else {
-        set type $ptype
+        set thing_type $ptype
     }
 
     return true
 }
 
-proc juick::parser_write {ptype thing tags urlInfo outVar} {
-    upvar 1 outVar out
-    lassign $urlInfo title url
+proc juick::parser_write {ptype thing thing_type tags url_info outVar} {
+    upvar 1 $outVar out
+    lassign $url_info title url
 
     if {[string match juick_md_url* $ptype]} {
         lappend out $url url $tags
         ::richtext::property_update url:title,$url $title
     } else {
-        lappend out $thing $ptype $tags
+        lappend out $thing $thing_type $tags
+        puts "APPEND: $thing type:$thing_type tags:$tags"
     }
 }
 
 proc juick::parser {ptype atLevel accName} {
     upvar #$atLevel $accName chunks
 
-    if {![::richtext::property_exists {JUICK}]} { return }
+    if {![::richtext::property_exists {JUICK}]} return
 
     set out {}
 
     foreach {s type tags} $chunks {
-        if {[lsearch -exact {text juick_citing) $type] == -1} {
+        if {[lsearch -exact {text juick_citing} $type] == -1} {
             # pass through
             lappend out $s $type $tags
             continue
@@ -626,7 +641,10 @@ proc juick::parser {ptype atLevel accName} {
 
         set index 0; set uStart 0; set uEnd 0
 
-        while {[eval {parser_spot $ptype $s $index uStart uEnd urlInfo}]} {
+        set url_info {}
+        set thing_type $type
+
+        while {[eval {parser_spot $ptype $s $index uStart uEnd thing_type url_info}]} {
             # Write out text before current thing, if exists
             if {$uStart - $index > 0} {
                 set text_before [string range $s $index [expr {$uStart - 1}]]
@@ -634,9 +652,9 @@ proc juick::parser {ptype atLevel accName} {
             }
 
             set thing [string range $s $uStart $uEnd]
-            lappend tags $ptype
+            set thing_tags [lfuse $tags [list $thing_type]]
             # Write out current thing
-            parser_write $ptype $thing $tags $urlInfo out
+            parser_write $ptype $thing $thing_type $thing_tags $url_info out
             set index [expr {$uEnd + 1}]
         }
 
@@ -651,7 +669,13 @@ proc juick::parser {ptype atLevel accName} {
 }
 
 proc juick::renderer {w type piece tags} {
+    # tmp
+    if {[lsearch -exact {"#" "@" "*"} [string index $piece 0]] >= 0} {
+        lappend tags JUICK-$piece
+    }
+
     $w insert end $piece $tags
+    puts "RENDER: $piece $tags"
 }
 
 # vi:ts=4:et
