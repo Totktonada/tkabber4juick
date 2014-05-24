@@ -3,6 +3,8 @@
 namespace eval juick {
 
 package require msgcat
+package require http
+
 set scriptdir [file dirname [info script]]
 ::msgcat::mcload [file join $scriptdir msgs]
 
@@ -16,15 +18,8 @@ if {![::plugins::is_registered juick]} {
             "Whether the Juick plugin is loaded."] \
         -loadcommand [namespace code load] \
         -unloadcommand [namespace code unload]
-    puts "!!!!"
     return
 }
-puts "...pass through..."
-
-# Tcl 8.5 for {*}, see http://wiki.tcl.tk/17158
-# TODO: unused?
-# package require Tcl 8.5
-package require http
 
 # Compatibility with old Tkabber version
 if {$::tkabber_version eq "0.11.1"} {
@@ -32,7 +27,8 @@ if {$::tkabber_version eq "0.11.1"} {
     source [file join $scriptdir $scriptname]
 }
 
-source [file join $scriptdir utils.tcl]
+namespace eval [namespace parent] \
+    {source [file join $juick::scriptdir utils.tcl]}
 
 # XRDB options
 option add *juick.number      blue         widgetDefault
@@ -61,10 +57,14 @@ variable richtext_tags {
     juick_my_msg  juick.my_msg     foreground
 }
 
-# See commented code in juick_commands_comps
-# variable juick::commands {HELP NICK LOGIN "S " "U " ON OFF "D " "BL " "WL " "PM " VCARD PING INVITE}
-# or
-variable commands {HELP NICK LOGIN S U ON OFF D BL WL PM VCARD PING INVITE}
+# Tags which not configured (has not special colors),
+# just contain some information:
+# 1. juick_clickable
+
+variable commands {
+    "S " "U " "D " "BL " "WL "
+    HELP NICK LOGIN ON OFF VCARD PING INVITE
+}
 
 # TODO: reconstructor for md urls
 # list of {name priority} sequences
@@ -100,7 +100,6 @@ variable plugin_hooks {
 # ==========
 
 proc juick::load {} {
-    puts "LOAD"
     variable richtext_parsers
     variable plugin_hooks
 
@@ -468,40 +467,20 @@ proc juick::add_chat_things_menu {m chatwin X Y x y} {
     }
 }
 
-# TODO: use [$t tag ranges JUICK]
-# or [$t tag prevrange JUICK] in replaced 'complete' proc.
 proc juick::juick_commands_comps {chatid compsvar wordstart line} {
-    if {![is_juick $chatid]} return
-
     upvar 0 $compsvar comps
-    variable chat_things
     variable commands
 
-    if {!$wordstart} {
-       set comps [concat $commands $comps]
-    } else {
-####################
-        # Currently not implemented.
-        if {0} {
-            # This code don't work.
-            # See ${PATH_TO_TKABBER}/plugins/chat/completion.tcl at line 94.
-            # Idea: use *rename* for procedure completion::complete.
-            set q 0
-            foreach cmd $commands {
-                if {[string equal -length [string length $cmd] $cmd $line]} {
-                    set q 1
-                    break
-                }
-            }
+    if {![is_juick $chatid] || $wordstart} return
 
-            if {!$q} return
-        }
-####################
+    # Collect chat things
+    set chat_things {}
+    set chatw [chat::chat_win $chatid]
+    foreach {idx1 idx2} [$chatw tag ranges juick_clickable] {
+        set chat_things [linsert $chat_things 0 [$chatw get $idx1 $idx2]]
     }
 
-    if {[info exist chat_things($chatid)]} {
-       set comps [concat $chat_things($chatid) $comps]
-    }
+    set comps [concat $chat_things $commands $comps]
 }
 
 # RichText stuff
@@ -512,8 +491,10 @@ proc juick::configurator {w} {
     variable richtext_tags
 
     foreach {tag_name xrdb_name xrdb_option} $richtext_tags {
-        set options($xrdb_name) [option get $w $xrdb_name Text]
-        $w tag configure $tag_name -$xrdb_option $options($xrdb_name)
+        if {$xrdb_name ne ""} {
+            set options($xrdb_name) [option get $w $xrdb_name Text]
+            $w tag configure $tag_name -$xrdb_option $options($xrdb_name)
+        }
     }
 
     # Display all things and citing in our message with 'my message' colors.
@@ -653,6 +634,9 @@ proc juick::parser {ptype atLevel accName} {
 
             set thing [string range $s $uStart $uEnd]
             set thing_tags [lfuse $tags [list $thing_type]]
+            if {[lsearch -exact {juick_number juick_nick juick_tag} $thing_type] >= 0} {
+                lappend thing_tags juick_clickable
+            }
             # Write out current thing
             parser_write $ptype $thing $thing_type $thing_tags $url_info out
             set index [expr {$uEnd + 1}]
@@ -669,13 +653,12 @@ proc juick::parser {ptype atLevel accName} {
 }
 
 proc juick::renderer {w type piece tags} {
-    # tmp
+    # tmp; TODO: remove
     if {[lsearch -exact {"#" "@" "*"} [string index $piece 0]] >= 0} {
         lappend tags JUICK-$piece
     }
 
     $w insert end $piece $tags
-    puts "RENDER: $piece $tags"
 }
 
 # vi:ts=4:et

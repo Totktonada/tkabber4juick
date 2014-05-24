@@ -4,9 +4,7 @@ if {[info exist ::juick-utils-tcl-sentry]} {
 
 set ::juick-utils-tcl-sentry 1
 
-# invoked from namespace ::plugins::juick
-
-proc get_tags_list {} {
+proc juick::get_tags_list {} {
     variable richtext_tags
     set res {}
 
@@ -17,7 +15,7 @@ proc get_tags_list {} {
     return [lsort -unique $res]
 }
 
-proc is_juick_jid {jid} {
+proc juick::is_juick_jid {jid} {
     set jid [::xmpp::jid::removeResource $jid]
     set node [::xmpp::jid::node $jid]
     return [expr {[string equal $jid "juick@juick.com"] || \
@@ -25,12 +23,12 @@ proc is_juick_jid {jid} {
 }
 
 # Determines whether given chatid correspond to Juick
-proc is_juick {chatid} {
+proc juick::is_juick {chatid} {
     set jid [chat::get_jid $chatid]
     return [is_juick_jid $jid]
 }
 
-proc get_my_juick_nickname {jid} {
+proc juick::get_my_juick_nickname {jid} {
     variable nicknames
 
     set uname ""
@@ -43,7 +41,7 @@ proc get_my_juick_nickname {jid} {
     return $uname
 }
 
-proc is_personal_juick_message {from body} {
+proc juick::is_personal_juick_message {from body} {
     variable options
 
     set private_msg [regexp {^Private message from @.+:\n} $body]
@@ -62,7 +60,7 @@ proc is_personal_juick_message {from body} {
     return [expr {$private_msg || $reply_to_me}]
 }
 
-proc send_to_juick {w body} {
+proc juick::send_to_juick {w body} {
     variable options
     set cw [join [lrange [split $w .] 0 end-1] .]
     set chatid [chat::winid_to_chatid $cw]
@@ -77,7 +75,7 @@ proc send_to_juick {w body} {
     message::send_msg $xlib $jid -type chat -body $body
 }
 
-proc get_juick_thread {w thing} {
+proc juick::get_juick_thread {w thing} {
     set cw [join [lrange [split $w .] 0 end-1] .]
     set chatid [chat::winid_to_chatid $cw]
     set xlib [chat::get_xlib $chatid]
@@ -92,7 +90,7 @@ proc get_juick_thread {w thing} {
         -command [list [namespace current]::receive_juick_thread $jid]
 }
 
-proc receive_juick_thread {jid res child0} {
+proc juick::receive_juick_thread {jid res child0} {
     if {![string equal $res ok]} return
 
     ::xmpp::xml::split $child0 tag0 xmlns0 attrs0 cdata0 subels0
@@ -122,12 +120,12 @@ proc receive_juick_thread {jid res child0} {
     return
 }
 
-proc copy_thing {w thing} {
+proc juick::copy_thing {w thing} {
     clipboard clear -displayof $w
     clipboard append -displayof $w $thing
 }
 
-proc browse_thing {w thing} {
+proc juick::browse_thing {w thing} {
     switch -regexp -- $thing {
         {^#} {
           regsub -- "/" [string range $thing 1 end] "#" jurl
