@@ -1,8 +1,9 @@
-if {[info exist ::juick-utils-tcl-sentry]} {
+if {[llength [info procs juick::juick-utils-tcl-sentry]] > 0} {
     return
 }
 
-set ::juick-utils-tcl-sentry 1
+# Just for avoid double including.
+proc juick::juick-utils-tcl-sentry {} {}
 
 proc juick::get_clickable_thing_at {w x y} {
     set tags [$w tag names "@$x,$y"]

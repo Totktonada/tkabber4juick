@@ -1,14 +1,15 @@
 # For list XRDB options find 'option add' lines.
 # TODO: reconstructor for md urls
 # TODO: jubo #dddddd
-# TODO: j2j, see below.
+# TODO: j2j, see below
+# TODO: one common type for 'renderer' (set in parser), like to_juick_renderer
 
 namespace eval juick {
 
 package require msgcat
 package require http
 
-set scriptdir [file dirname [info script]]
+variable scriptdir [file dirname [info script]]
 ::msgcat::mcload [file join $scriptdir msgs]
 
 # Register plugin for further load/unload via GUI.
@@ -23,15 +24,6 @@ if {![::plugins::is_registered juick]} {
         -unloadcommand [namespace code unload]
     return
 }
-
-# Compatibility with old Tkabber version
-if {$::tkabber_version eq "0.11.1"} {
-    set scriptname tkabber-0.11.1-compatibility.tcl 
-    source [file join $scriptdir $scriptname]
-}
-
-namespace eval [namespace parent] \
-    {source [file join $juick::scriptdir utils.tcl]}
 
 # XRDB options
 option add *juick.number      blue         widgetDefault
@@ -62,7 +54,7 @@ variable richtext_tags {
 
 # Tags which not configured (has not special colors),
 # just contain some information:
-# 1. juick_clickable
+# 1. juick_clickable - juick_(number|nick|tag)
 
 variable commands {
     "S " "U " "D " "BL " "WL "
@@ -76,7 +68,7 @@ variable richtext_parsers {
     juick_number                  54
     juick_private                 81
     juick_citing                  82
-    juick_nicks_tags              85
+    juick_nicks_tags              49
 }
 
 # list of {hook proc priority orig_proc} sequences
@@ -95,6 +87,13 @@ variable plugin_hooks {
         ::::ifacetk::add_number_of_messages_to_title
 }
 
+# Compatibility with <tkabber-1.2
+if {[string match {1.[01]*} $::tkabber_version]} {
+    set scriptname "tkabber-1.0-1.1-compatibility.tcl"
+    namespace eval [namespace parent] \
+        [format {source [file join "%s" "%s"]} $scriptdir $scriptname]
+}
+
 # namespace juick
 }
 
@@ -102,11 +101,15 @@ variable plugin_hooks {
 # ==========
 
 proc juick::load {} {
+    variable scriptdir
     variable richtext_parsers
     variable plugin_hooks
 
-    ::richtext::entity_state juick_config 0
-    ::richtext::register_entity juick_config \
+    namespace eval [namespace parent] \
+        [format {source [file join "%s" utils.tcl]} $scriptdir]
+
+    ::richtext::entity_state juick_configurator 0
+    ::richtext::register_entity juick_configurator \
         -configurator [namespace current]::configurator
 
     foreach tag_name [get_tags_list] {
@@ -153,15 +156,17 @@ proc juick::unload {} {
     variable richtext_parsers
     variable plugin_hooks
 
-    ::richtext::unregister_entity juick_config
+    ::richtext::unregister_entity juick_configurator
+    ::richtext::entity_state juick_configurator 0
 
     foreach tag_name [get_tags_list] {
         ::richtext::unregister_entity $tag_name
+        ::richtext::entity_state $tag_name 0
     }
 
     foreach {name _} $richtext_parsers {
-        ::richtext::entity_state $name 0
         ::richtext::unregister_entity $name
+        ::richtext::entity_state $name 0
     }
 
     foreach {hook proc priority orig_proc} $plugin_hooks {
@@ -544,13 +549,12 @@ proc juick::parser_spot_md_url {ptype what at startVar endVar url_infoVar} {
     return true
 }
 
-proc juick::parser_spot {ptype what at startVar endVar thing_typeVar url_infoVar} {
+proc juick::parser_spot {ptype what at startVar endVar url_infoVar} {
     upvar 1 $startVar uStart $endVar uEnd
-    upvar 1 $thing_typeVar thing_type $url_infoVar url_info
+    upvar 1 $url_infoVar url_info
 
     switch -glob $ptype {
         juick_md_url* {
-            set thing_type $ptype
             return [parser_spot_md_url $ptype $what $at uStart uEnd url_info]
         }
         juick_number {
@@ -572,19 +576,29 @@ proc juick::parser_spot {ptype what at startVar endVar thing_typeVar url_infoVar
     lassign $bounds uStart uEnd
     set thing [string range $what $uStart $uEnd]
 
-    if {$ptype eq "juick_nicks_tags"} {
-        switch -exact [string index $thing 0] {
-            "@" { set thing_type juick_nick   }
-            "*" { set thing_type juick_tag    }
-        }
-    } else {
-        set thing_type $ptype
-    }
-
     return true
 }
 
-proc juick::parser_write {ptype thing thing_type tags url_info outVar} {
+proc juick::thing_tags {ptype thing tags} {
+    if {$ptype eq "juick_nicks_tags"} {
+        switch -exact [string index $thing 0] {
+            "@" { set newtag juick_nick   }
+            "*" { set newtag juick_tag    }
+        }
+    } else {
+        set newtag $ptype
+    }
+
+    lappend tags $newtag
+
+    if {[lsearch -exact {juick_number juick_nick juick_tag} $newtag] >= 0} {
+        lappend tags juick_clickable
+    }
+
+    return $tags
+}
+
+proc juick::parser_write {ptype thing tags url_info outVar} {
     upvar 1 $outVar out
     lassign $url_info title url
 
@@ -592,8 +606,8 @@ proc juick::parser_write {ptype thing thing_type tags url_info outVar} {
         lappend out $url url $tags
         ::richtext::property_update url:title,$url $title
     } else {
-        lappend out $thing $thing_type $tags
-        puts "APPEND: $thing type:$thing_type tags:$tags"
+        lappend out $thing to_juick_renderer $tags
+        puts "APPEND: $thing type:to_juick_renderer tags:$tags"
     }
 }
 
@@ -614,9 +628,8 @@ proc juick::parser {ptype atLevel accName} {
         set index 0; set uStart 0; set uEnd 0
 
         set url_info {}
-        set thing_type $type
 
-        while {[eval {parser_spot $ptype $s $index uStart uEnd thing_type url_info}]} {
+        while {[eval {parser_spot $ptype $s $index uStart uEnd url_info}]} {
             # Write out text before current thing, if exists
             if {$uStart - $index > 0} {
                 set text_before [string range $s $index [expr {$uStart - 1}]]
@@ -624,12 +637,9 @@ proc juick::parser {ptype atLevel accName} {
             }
 
             set thing [string range $s $uStart $uEnd]
-            set thing_tags [lfuse $tags [list $thing_type]]
-            if {[lsearch -exact {juick_number juick_nick juick_tag} $thing_type] >= 0} {
-                lappend thing_tags juick_clickable
-            }
+            set thing_tags [thing_tags $ptype $thing $tags]
             # Write out current thing
-            parser_write $ptype $thing $thing_type $thing_tags $url_info out
+            parser_write $ptype $thing $thing_tags $url_info out
             set index [expr {$uEnd + 1}]
         }
 
