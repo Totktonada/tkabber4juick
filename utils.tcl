@@ -16,17 +16,6 @@ proc juick::get_clickable_thing_at {w x y} {
     return ""
 }
 
-proc juick::get_tags_list {} {
-    variable richtext_tags
-    set res {}
-
-    foreach {tag_name _ _} $richtext_tags {
-        lappend res $tag_name
-    }
-
-    return [lsort -unique $res]
-}
-
 proc juick::is_juick_jid {jid} {
     set jid [::xmpp::jid::removeResource $jid]
     set node [::xmpp::jid::node $jid]

@@ -2,7 +2,7 @@
 # TODO: reconstructor for md urls
 # TODO: jubo #dddddd
 # TODO: j2j, see below
-# TODO: one common type for 'renderer' (set in parser), like to_juick_renderer
+# TODO: fix #1#2
 
 namespace eval juick {
 
@@ -54,7 +54,7 @@ variable richtext_tags {
 
 # Tags which not configured (has not special colors),
 # just contain some information:
-# 1. juick_clickable - juick_(number|nick|tag)
+# 1. juick_clickable - for juick_(number|nick|tag)
 
 variable commands {
     "S " "U " "D " "BL " "WL "
@@ -108,15 +108,9 @@ proc juick::load {} {
     namespace eval [namespace parent] \
         [format {source [file join "%s" utils.tcl]} $scriptdir]
 
-    ::richtext::entity_state juick_configurator 0
-    ::richtext::register_entity juick_configurator \
+    ::richtext::entity_state to_juick_configurator 0
+    ::richtext::register_entity to_juick_configurator \
         -configurator [namespace current]::configurator
-
-    foreach tag_name [get_tags_list] {
-        ::richtext::entity_state $tag_name 0
-        ::richtext::register_entity $tag_name \
-            -renderer [namespace current]::renderer
-    }
 
     foreach {name priority} $richtext_parsers {
         ::richtext::entity_state $name 1
@@ -156,13 +150,8 @@ proc juick::unload {} {
     variable richtext_parsers
     variable plugin_hooks
 
-    ::richtext::unregister_entity juick_configurator
-    ::richtext::entity_state juick_configurator 0
-
-    foreach tag_name [get_tags_list] {
-        ::richtext::unregister_entity $tag_name
-        ::richtext::entity_state $tag_name 0
-    }
+    ::richtext::unregister_entity to_juick_configurator
+    ::richtext::entity_state to_juick_configurator 0
 
     foreach {name _} $richtext_parsers {
         ::richtext::unregister_entity $name
@@ -407,6 +396,7 @@ proc juick::insert_by_click {chatid w x y} {
     set jid [::xmpp::jid::removeResource [chat::get_jid $chatid]]
     set thing [get_clickable_thing_at $w $x $y]
     if {$thing eq ""} return
+    puts "CLICK: $thing"
 
     if {![is_juick_jid $jid]} {
         set xlib [chat::get_xlib $chatid]
@@ -651,10 +641,6 @@ proc juick::parser {ptype atLevel accName} {
     }
 
     set chunks $out
-}
-
-proc juick::renderer {w type piece tags} {
-    $w insert end $piece $tags
 }
 
 # vi:ts=4:et
