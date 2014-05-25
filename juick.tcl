@@ -3,6 +3,7 @@
 # TODO: jubo #dddddd
 # TODO: j2j, see below
 # TODO: fix #1#2
+# TODO: fix 'replies to you'
 
 namespace eval juick {
 
@@ -135,13 +136,13 @@ proc juick::load {} {
     custom::defgroup Juick [::msgcat::mc "Juick settings."] \
         -group Plugins
     custom::defvar options(main_jid) "juick@juick.com/Juick" \
-        [::msgcat::mc "Main Juick JID. This used for \
+        [::msgcat::mc "Main Juick JID. This used for\
             forwarding things from other chats."] \
         -group Juick -type string
     custom::defvar options(special_update_juick_tab) 1 \
-        [::msgcat::mc "Indicate as personal message only private \
-            messages and replies to you.\nYour Juick nickname \
-            determines at roster receiving, so after enable option \
+        [::msgcat::mc "Indicate as personal message only private\
+            messages and replies to you.\nYour Juick nickname\
+            determines at roster receiving, so after enable option\
             you need to reconnecting."] \
         -group Juick -type boolean
 }
@@ -596,8 +597,8 @@ proc juick::parser_write {ptype thing tags url_info outVar} {
         lappend out $url url $tags
         ::richtext::property_update url:title,$url $title
     } else {
-        lappend out $thing to_juick_renderer $tags
-        puts "APPEND: $thing type:to_juick_renderer tags:$tags"
+        lappend out $thing juick_thing $tags
+        puts "APPEND: $thing type:juick_thing tags:$tags"
     }
 }
 

@@ -11,7 +11,7 @@
 "Параметры расширения для удобной работы с Juick."
 
 ::msgcat::mcset ru "Main Juick JID. This used for forwarding things from other chats." \
-"Главный JID Juick'а. Используется для перенаправления сущностей из других чатов."
+"Главный JID Juick’а. Используется для перенаправления сущностей из других чатов."
 
 ::msgcat::mcset ru "Indicate as personal message only private messages and replies to you.\nYour Juick nickname determines at roster receiving, so after enable option you need to reconnecting." \
 "Отмечать как персональные только приватные и адресованные вам сообщения.\nВаш псевдоним на Juick определяется при получении ростера, поэтому для работы опции после её включения требуется переподключение."
