@@ -4,6 +4,12 @@
 # TODO: j2j, see below
 # TODO: fix #1#2
 # TODO: fix 'replies to you'
+# TODO: fix displaying nick in citate
+
+# JUICK-* or list analogue for inrert by click -- ok.
+# For tab completition? [tag ranges] -> filter JUICK-* -> гарантированно в порядке следования?
+
+# TODO: idea: ... (end of citate) as button for decollapse citate.
 
 namespace eval juick {
 
