@@ -2,10 +2,6 @@
 # TODO: reconstructor for md urls
 # TODO: jubo #dddddd
 # TODO: j2j, see below
-# TODO: fix #1#2
-
-# JUICK-* or list analogue for inrert by click -- ok.
-# For tab completition? [tag ranges] -> filter JUICK-* -> гарантированно в порядке следования?
 
 # TODO: idea: ... (end of citate) as button for decollapse citate.
 
@@ -59,7 +55,8 @@ variable richtext_tags {
 
 # Tags which not configured (has not special colors),
 # just contain some information:
-# 1. juick_clickable - for juick_(number|nick|tag)
+# 1. juick_clickable  -- for juick_(number|nick|tag)
+# 2. juick_id_*       -- for the same
 
 variable commands {
     S U D BL WL HELP NICK LOGIN ON OFF VCARD PING INVITE
@@ -460,10 +457,22 @@ proc juick::juick_commands_comps {chatid compsvar wordstart line} {
     if {![is_juick $chatid]} return
 
     # Collect chat things
-    set chat_things {}
+    set chat_items {}
     set chatw [chat::chat_win $chatid]
-    foreach {idx1 idx2} [$chatw tag ranges juick_clickable] {
-        set chat_things [linsert $chat_things 0 [$chatw get $idx1 $idx2]]
+    set tags [$chatw tag names]
+    set ids [lsearch -glob -inline -all $tags juick_id_*]
+    foreach id $ids {
+        foreach {idx1 idx2} [$chatw tag ranges $id] {
+            set thing [$chatw get $idx1 $idx2]
+            set chat_items [linsert $chat_items 0 $idx1 $thing]
+        }
+    }
+
+    # Sort chat things
+    set chat_things {}
+    set chat_items [lsort -real -decreasing -stride 2 -index 0 $chat_items]
+    foreach {idx thing} $chat_items {
+        lappend chat_things $thing
     }
 
     set comps [concat $chat_things $commands $comps]
@@ -571,7 +580,7 @@ proc juick::parser_spot {ptype what at startVar endVar url_infoVar} {
     return true
 }
 
-proc juick::update_tags_type {ptype thing tagsVar typeVar} {
+proc juick::update_tags_type {ptype thing id tagsVar typeVar} {
     upvar 1 $tagsVar tags
     upvar 1 $typeVar type
 
@@ -588,12 +597,13 @@ proc juick::update_tags_type {ptype thing tagsVar typeVar} {
 
     if {[lsearch -exact {juick_number juick_nick juick_tag} $newtag] >= 0} {
         lappend tags juick_clickable
+        lappend tags "juick_id_$id"
     }
 
     set type $newtag
 }
 
-proc juick::parser_write {ptype thing tags url_info outVar} {
+proc juick::parser_write {ptype thing id tags url_info outVar} {
     upvar 1 $outVar out
     lassign $url_info title url
 
@@ -602,7 +612,7 @@ proc juick::parser_write {ptype thing tags url_info outVar} {
         ::richtext::property_update url:title,$url $title
     } else {
         set type {}
-        update_tags_type $ptype $thing tags type
+        update_tags_type $ptype $thing $id tags type
         lappend out $thing $type $tags
         puts "APPEND: $thing type:$type tags:$tags"
     }
@@ -634,8 +644,9 @@ proc juick::parser {ptype atLevel accName} {
             }
 
             set thing [string range $s $uStart $uEnd]
+            set id "${thing}_${uStart}_${uEnd}"
             # Write out current thing
-            parser_write $ptype $thing $tags $url_info out
+            parser_write $ptype $thing $id $tags $url_info out
             set index [expr {$uEnd + 1}]
         }
 

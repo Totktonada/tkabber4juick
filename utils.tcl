@@ -9,7 +9,9 @@ proc juick::get_clickable_thing_at {w x y} {
     set tags [$w tag names "@$x,$y"]
 
     if {[lsearch -exact $tags juick_clickable] >= 0} {
-        lassign [$w tag prevrange juick_clickable "@$x,$y + 1c"] idx1 idx2
+        set id [lsearch -glob -inline $tags juick_id_*]
+        if {$id == ""} { return "" }
+        lassign [$w tag prevrange $id "@$x,$y + 1c"] idx1 idx2
         return [$w get $idx1 $idx2]
     }
 
