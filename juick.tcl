@@ -88,12 +88,10 @@ variable plugin_hooks {
         ::::ifacetk::add_number_of_messages_to_title
 }
 
-# Compatibility with <tkabber-1.2
-if {[string match {1.[01]*} $::tkabber_version]} {
-    set scriptname "tkabber-1.0-1.1-compatibility.tcl"
-    namespace eval [namespace parent] \
-        [format {source [file join "%s" "%s"]} $scriptdir $scriptname]
-}
+# Compatibility with tkabber-1.0* and some tkabber-1.1*
+set scriptname "tkabber-1.0-1.1-compatibility.tcl"
+namespace eval [namespace parent] \
+    [format {source [file join "%s" "%s"]} $scriptdir $scriptname]
 
 # namespace juick
 }
