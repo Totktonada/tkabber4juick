@@ -3,7 +3,6 @@
 # TODO: jubo #dddddd
 # TODO: j2j, see below
 # TODO: fix #1#2
-# TODO: fix 'replies to you'
 # TODO: fix displaying nick in citate
 
 # JUICK-* or list analogue for inrert by click -- ok.
