@@ -3,7 +3,6 @@
 # TODO: jubo #dddddd
 # TODO: j2j, see below
 # TODO: fix #1#2
-# TODO: fix displaying nick in citate
 
 # JUICK-* or list analogue for inrert by click -- ok.
 # For tab completition? [tag ranges] -> filter JUICK-* -> гарантированно в порядке следования?
@@ -72,7 +71,7 @@ variable richtext_parsers {
     juick_md_url_round_brackets   49
     juick_number                  54
     juick_private                 48
-    juick_citing                  82
+    juick_citing                  48
     juick_nicks_tags              49
 }
 
@@ -572,11 +571,14 @@ proc juick::parser_spot {ptype what at startVar endVar url_infoVar} {
     return true
 }
 
-proc juick::thing_tags {ptype thing tags} {
+proc juick::update_tags_type {ptype thing tagsVar typeVar} {
+    upvar 1 $tagsVar tags
+    upvar 1 $typeVar type
+
     if {$ptype eq "juick_nicks_tags"} {
         switch -exact [string index $thing 0] {
-            "@" { set newtag juick_nick   }
-            "*" { set newtag juick_tag    }
+            "@" { set newtag juick_nick }
+            "*" { set newtag juick_tag }
         }
     } else {
         set newtag $ptype
@@ -588,7 +590,7 @@ proc juick::thing_tags {ptype thing tags} {
         lappend tags juick_clickable
     }
 
-    return $tags
+    set type $newtag
 }
 
 proc juick::parser_write {ptype thing tags url_info outVar} {
@@ -599,8 +601,10 @@ proc juick::parser_write {ptype thing tags url_info outVar} {
         lappend out $url url $tags
         ::richtext::property_update url:title,$url $title
     } else {
-        lappend out $thing juick_thing $tags
-        puts "APPEND: $thing type:juick_thing tags:$tags"
+        set type {}
+        update_tags_type $ptype $thing tags type
+        lappend out $thing $type $tags
+        puts "APPEND: $thing type:$type tags:$tags"
     }
 }
 
@@ -622,7 +626,7 @@ proc juick::parser {ptype atLevel accName} {
 
         set url_info {}
 
-        while {[eval {parser_spot $ptype $s $index uStart uEnd url_info}]} {
+        while {[parser_spot $ptype $s $index uStart uEnd url_info]} {
             # Write out text before current thing, if exists
             if {$uStart - $index > 0} {
                 set text_before [string range $s $index [expr {$uStart - 1}]]
@@ -630,9 +634,8 @@ proc juick::parser {ptype atLevel accName} {
             }
 
             set thing [string range $s $uStart $uEnd]
-            set thing_tags [thing_tags $ptype $thing $tags]
             # Write out current thing
-            parser_write $ptype $thing $thing_tags $url_info out
+            parser_write $ptype $thing $tags $url_info out
             set index [expr {$uEnd + 1}]
         }
 
