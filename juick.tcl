@@ -69,11 +69,11 @@ variable commands {
 }
 
 # list of {name priority} sequences
-variable richtext_parsers { 
+variable richtext_parsers {
     juick_md_url_square_brackets  49
     juick_md_url_round_brackets   49
     juick_number                  54
-    juick_private                 81
+    juick_private                 48
     juick_citing                  82
     juick_nicks_tags              49
 }
