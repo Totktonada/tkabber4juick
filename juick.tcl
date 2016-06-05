@@ -508,7 +508,7 @@ proc juick::configurator {w} {
 proc juick::parser_spot_md_url {ptype what at startVar endVar url_infoVar} {
     variable ::plugins::urls::url_regexp
     upvar 1 $url_infoVar url_info
- 
+
     switch -exact $ptype {
         juick_md_url_square_brackets {
             # [title][URL]
