@@ -33,13 +33,13 @@ if {![::plugins::is_registered juick]} {
 }
 
 # XRDB options
-option add *juick.number      blue         widgetDefault
-option add *juick.private_fg  blue         widgetDefault
-option add *juick.private_bg  #FF9A15      widgetDefault
-option add *juick.citing      gray35       widgetDefault
-option add *juick.nick        red          widgetDefault
-option add *juick.tag         ForestGreen  widgetDefault
-option add *juick.my_msg      gray         widgetDefault
+option add *juick_number      blue         widgetDefault
+option add *juick_private_fg  blue         widgetDefault
+option add *juick_private_bg  #FF9A15      widgetDefault
+option add *juick_citing      gray35       widgetDefault
+option add *juick_nick        red          widgetDefault
+option add *juick_tag         ForestGreen  widgetDefault
+option add *juick_my_msg      gray         widgetDefault
 
 # Global variables and constants
 # ==============================
@@ -50,13 +50,13 @@ variable nicknames
 # list of {tag_name xrdb_name xrdb_option} sequences
 # used in 'configurator' proc
 variable richtext_tags {
-    juick_number  juick.number     foreground
-    juick_private juick.private_fg foreground
-    juick_private juick.private_bg background
-    juick_citing  juick.citing     foreground
-    juick_nick    juick.nick       foreground
-    juick_tag     juick.tag        foreground
-    juick_my_msg  juick.my_msg     foreground
+    juick_number  juick_number     foreground
+    juick_private juick_private_fg foreground
+    juick_private juick_private_bg background
+    juick_citing  juick_citing     foreground
+    juick_nick    juick_nick       foreground
+    juick_tag     juick_tag        foreground
+    juick_my_msg  juick_my_msg     foreground
 }
 
 # Tags which not configured (has not special colors),
