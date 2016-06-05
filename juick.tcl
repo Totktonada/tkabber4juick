@@ -64,8 +64,7 @@ variable richtext_tags {
 # 1. juick_clickable - for juick_(number|nick|tag)
 
 variable commands {
-    "S " "U " "D " "BL " "WL "
-    HELP NICK LOGIN ON OFF VCARD PING INVITE
+    S U D BL WL HELP NICK LOGIN ON OFF VCARD PING INVITE
 }
 
 # list of {name priority} sequences
@@ -460,7 +459,7 @@ proc juick::juick_commands_comps {chatid compsvar wordstart line} {
     upvar 0 $compsvar comps
     variable commands
 
-    if {![is_juick $chatid] || $wordstart} return
+    if {![is_juick $chatid]} return
 
     # Collect chat things
     set chat_things {}
