@@ -113,8 +113,8 @@ proc juick::load {} {
     namespace eval [namespace parent] \
         [format {source [file join "%s" utils.tcl]} $scriptdir]
 
-    ::richtext::entity_state to_juick_configurator 0
-    ::richtext::register_entity to_juick_configurator \
+    ::richtext::entity_state juick_configurator 1
+    ::richtext::register_entity juick_configurator \
         -configurator [namespace current]::configurator
 
     foreach {name priority} $richtext_parsers {
@@ -155,8 +155,8 @@ proc juick::unload {} {
     variable richtext_parsers
     variable plugin_hooks
 
-    ::richtext::unregister_entity to_juick_configurator
-    ::richtext::entity_state to_juick_configurator 0
+    ::richtext::unregister_entity juick_configurator
+    ::richtext::entity_state juick_configurator 0
 
     foreach {name _} $richtext_parsers {
         ::richtext::unregister_entity $name
