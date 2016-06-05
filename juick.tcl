@@ -1,4 +1,3 @@
-# For list XRDB options find 'option add' lines.
 # TODO: reconstructor for md urls
 # TODO: jubo #dddddd
 # TODO: j2j, see below
