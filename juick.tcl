@@ -1,4 +1,3 @@
-# TODO: reconstructor for md urls
 # TODO: jubo #dddddd
 # TODO: j2j, see below
 
