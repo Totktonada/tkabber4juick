@@ -245,7 +245,8 @@ proc juick::determine_juick_nick {xlib jid name groups subsc ask} {
 proc juick::draw_message_handle {chatid from type body x} {
     if {![is_juick $chatid]} return
 
-    ::richtext::property_add {JUICK} {}
+    # Allow juick::parser to process given chat.
+    ::richtext::property_add {PROCESS_AS_JUICK_MESSAGE} {}
 
     set chatw [chat::chat_win $chatid]
     set jid [chat::get_jid $chatid]
@@ -617,7 +618,7 @@ proc juick::parser_write {ptype thing id tags url_info outVar} {
 proc juick::parser {ptype atLevel accName} {
     upvar #$atLevel $accName chunks
 
-    if {![::richtext::property_exists {JUICK}]} return
+    if {![::richtext::property_exists {PROCESS_AS_JUICK_MESSAGE}]} return
 
     set out {}
 
