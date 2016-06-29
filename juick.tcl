@@ -576,7 +576,7 @@ proc juick::parser_spot {ptype processing_type what at startVar endVar \
             set re {(?:\n|\A)(>[^\n]+)}
         }
         juick_nicks_tags {
-            set re {(?:\s|\n|\A|\(|\>)(@[\w@.-]+|\*[\w?!+'/.-@*]+)(?:(\.(\s|\n))?)}
+            set re {(?:\s|\n|\A|\(|\>|:)(@[\w@.-]+|\*[\w?!+'/.-@*]+)(?:(\.(\s|\n))?)}
         }
     }
 
