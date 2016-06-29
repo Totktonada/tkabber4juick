@@ -393,7 +393,6 @@ proc juick::insert_by_click {chatid w x y} {
     set jid [::xmpp::jid::removeResource [chat::get_jid $chatid]]
     set thing [get_clickable_thing_at $w $x $y]
     if {$thing eq ""} return
-    puts "CLICK: $thing"
 
     if {![is_juick_jid $jid]} {
         set xlib [chat::get_xlib $chatid]
@@ -612,7 +611,6 @@ proc juick::parser_write {ptype thing id tags url_info outVar} {
         set type {}
         update_tags_type $ptype $thing $id tags type
         lappend out $thing $type $tags
-        puts "APPEND: $thing type:$type tags:$tags"
     }
 }
 
