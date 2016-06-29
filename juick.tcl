@@ -489,7 +489,12 @@ proc juick::configurator {w} {
     variable options
     variable richtext_tags
 
-    # TODO: check window for juick/jubo and exit if not on it.
+    # Seems hacky, but found in events::event_composing in Tkabber sources.
+    set cw [join [lrange [split $w .] 0 end-1] .]
+    set chatid [chat::winid_to_chatid $cw]
+    if {![chat::is_chat $chatid]} { return }
+
+    if {![is_juick $chatid] && ![is_jubo $chatid]} { return }
 
     foreach {tag_name xrdb_name xrdb_option} $richtext_tags {
         if {$xrdb_name ne ""} {
