@@ -60,6 +60,8 @@ proc juick::get_my_juick_nickname {jid} {
 proc juick::is_personal_juick_message {from body} {
     variable options
 
+    if {![is_juick_jid $from]} { return 0 }
+
     set private_msg [regexp {^Private message from @.+:\n} $body]
 
     set reply_to_comment [regexp \

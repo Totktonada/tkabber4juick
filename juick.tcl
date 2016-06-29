@@ -1,4 +1,3 @@
-# TODO: jubo #dddddd
 # TODO: j2j, see below
 
 # TODO: idea: ... (end of citate) as button for decollapse citate.
@@ -266,11 +265,15 @@ proc juick::draw_message_handle {chatid from type body x} {
     return stop
 }
 
-proc juick::update_juick_tab {chatid from type body x} {
+proc juick::is_allow_to_special_update_juick_tab {from type} {
     variable options
-    if {!([is_juick_jid $from] && ($type eq "chat") \
-        && $options(special_update_juick_tab))} \
-    {
+    return [expr {!([is_juick_jid $from] || [is_jubo_jid $from]) || \
+        !($type eq "chat") || \
+        !$options(special_update_juick_tab)}]
+}
+
+proc juick::update_juick_tab {chatid from type body x} {
+    if {[is_allow_to_special_update_juick_tab $from $type]} {
         ::plugins::update_tab::update $chatid $from $type $body $x
         return
     }
@@ -294,17 +297,14 @@ proc juick::update_juick_tab {chatid from type body x} {
 }
 
 proc juick::ignore_server_messages {chatid from type body x} {
-    if {[is_juick $chatid] && $from eq ""} {
+    if {([is_juick $chatid] || [is_jubo $chatid]) && $from eq ""} {
         return stop
     }
 }
 
 # Add number of messages from Juick to the tab title
 proc juick::add_number_to_tab_title {chatid from type body x} {
-    variable options
-    if {!([is_juick_jid $from] && ($type eq "chat") \
-        && $options(special_update_juick_tab))} \
-    {
+    if {[is_allow_to_special_update_juick_tab $from $type]} {
         ::ifacetk::add_number_of_messages_to_title $chatid $from $type \
             $body $x
         return
