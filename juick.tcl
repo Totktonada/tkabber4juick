@@ -243,10 +243,16 @@ proc juick::determine_juick_nick {xlib jid name groups subsc ask} {
 }
 
 proc juick::draw_message_handle {chatid from type body x} {
-    if {![is_juick $chatid]} return
-
-    # Allow juick::parser to process given chat.
-    ::richtext::property_add {PROCESS_AS_JUICK_MESSAGE} {}
+    if {[is_juick $chatid]} {
+        # Allow juick::parser to process given chat as a juick chat.
+        ::richtext::property_add {PROCESS_AS_JUICK_MESSAGE} {}
+    } elseif {[is_jubo $chatid]} {
+        # Allow juick::parser to process given chat as a jubo chat.
+        ::richtext::property_add {PROCESS_AS_JUBO_MESSAGE} {}
+    } else {
+        # Disallow juick::parser to process message.
+        return
+    }
 
     set chatw [chat::chat_win $chatid]
     set jid [chat::get_jid $chatid]
@@ -548,7 +554,9 @@ proc juick::parser_spot_md_url {ptype what at startVar endVar url_infoVar} {
     return true
 }
 
-proc juick::parser_spot {ptype what at startVar endVar url_infoVar} {
+proc juick::parser_spot {ptype processing_type what at startVar endVar \
+    url_infoVar} \
+{
     upvar 1 $startVar uStart $endVar uEnd
     upvar 1 $url_infoVar url_info
 
@@ -560,9 +568,11 @@ proc juick::parser_spot {ptype what at startVar endVar url_infoVar} {
             set re {(?:\s|\n|\A|\(|\>)(#\d+(/\d+)?)(?:(\.(\s|\n))?)}
         }
         juick_private {
+            if {$processing_type != "juick"} { return false }
             set re {(^Private message)(?: from @.+:\n)}
         }
         juick_citing {
+            if {$processing_type != "juick"} { return false }
             set re {(?:\n|\A)(>[^\n]+)}
         }
         juick_nicks_tags {
@@ -618,7 +628,14 @@ proc juick::parser_write {ptype thing id tags url_info outVar} {
 proc juick::parser {ptype atLevel accName} {
     upvar #$atLevel $accName chunks
 
-    if {![::richtext::property_exists {PROCESS_AS_JUICK_MESSAGE}]} return
+    set processing_type {}
+    if {[::richtext::property_exists {PROCESS_AS_JUICK_MESSAGE}]} {
+        set processing_type "juick"
+    } elseif {[::richtext::property_exists {PROCESS_AS_JUBO_MESSAGE}]} {
+        set processing_type "jubo"
+    } else {
+        return
+    }
 
     set out {}
 
@@ -633,7 +650,9 @@ proc juick::parser {ptype atLevel accName} {
 
         set url_info {}
 
-        while {[parser_spot $ptype $s $index uStart uEnd url_info]} {
+        while {[parser_spot $ptype $processing_type $s $index uStart uEnd \
+            url_info]} \
+        {
             # Write out text before current thing, if exists
             if {$uStart - $index > 0} {
                 set text_before [string range $s $index [expr {$uStart - 1}]]

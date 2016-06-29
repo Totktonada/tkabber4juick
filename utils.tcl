@@ -31,6 +31,19 @@ proc juick::is_juick {chatid} {
     return [is_juick_jid $jid]
 }
 
+proc juick::is_jubo_jid {jid} {
+    set jid [::xmpp::jid::removeResource $jid]
+    set node [::xmpp::jid::node $jid]
+    return [expr {[string equal $jid "jubo@nologin.ru"] || \
+        [string equal $node "jubo%nologin.ru"]}]
+}
+
+# Determines whether given chatid correspond to Jubo
+proc juick::is_jubo {chatid} {
+    set jid [chat::get_jid $chatid]
+    return [is_jubo_jid $jid]
+}
+
 proc juick::get_my_juick_nickname {jid} {
     variable nicknames
 
